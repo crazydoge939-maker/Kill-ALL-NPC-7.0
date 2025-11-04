@@ -13,7 +13,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game.CoreGui
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 300, 0, 180)
+Frame.Size = UDim2.new(0, 300, 0, 250)
 Frame.Position = UDim2.new(0, 20, 0, 20)
 Frame.BackgroundColor3 = Color3.fromRGB(40, 44, 52)
 Frame.BorderSizePixel = 0
@@ -52,7 +52,7 @@ buttonCorner.Parent = ToggleButton
 ToggleButton.Parent = Frame
 
 local KillCountLabel = Instance.new("TextLabel")
-KillCountLabel.Size = UDim2.new(1, -40, 0, 70)
+KillCountLabel.Size = UDim2.new(1, -40, 0, 120) 
 KillCountLabel.Position = UDim2.new(0, 20, 0, 95)
 KillCountLabel.BackgroundTransparency = 1
 KillCountLabel.Text = "Жертвы:\n"
@@ -60,13 +60,14 @@ KillCountLabel.TextWrapped = true
 KillCountLabel.TextXAlignment = Enum.TextXAlignment.Left
 KillCountLabel.TextYAlignment = Enum.TextYAlignment.Top
 KillCountLabel.Font = Enum.Font.Gotham
-KillCountLabel.TextSize = 14
+KillCountLabel.TextSize = 20
 KillCountLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 KillCountLabel.Parent = Frame
 
+-- Переносим линию прогресса ниже логов
 local ProgressBackground = Instance.new("Frame")
 ProgressBackground.Size = UDim2.new(1, -40, 0, 10)
-ProgressBackground.Position = UDim2.new(0, 20, 0, 165)
+ProgressBackground.Position = UDim2.new(0, 20, 0, 230)
 ProgressBackground.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 ProgressBackground.BorderSizePixel = 0
 local progressCorner = Instance.new("UICorner")
