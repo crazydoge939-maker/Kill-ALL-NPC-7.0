@@ -1,6 +1,6 @@
 -- Основные переменные
 local isKilling = false
-local killInterval = 5
+local killInterval = 2
 local lastKillTime = 0
 local runService = game:GetService("RunService")
 local Players = game:GetService("Players")
