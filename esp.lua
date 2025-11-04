@@ -45,7 +45,7 @@ ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
 ToggleButton.Font = Enum.Font.GothamBold
 ToggleButton.TextSize = 16
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.Text = "Начать убийство"
+ToggleButton.Text = "Start Kill"
 local buttonCorner = Instance.new("UICorner")
 buttonCorner.CornerRadius = UDim.new(0, 8)
 buttonCorner.Parent = ToggleButton
@@ -55,7 +55,7 @@ local KillCountLabel = Instance.new("TextLabel")
 KillCountLabel.Size = UDim2.new(1, -40, 0, 120)
 KillCountLabel.Position = UDim2.new(0, 20, 0, 95)
 KillCountLabel.BackgroundTransparency = 1
-KillCountLabel.Text = "Жертвы:\n"
+KillCountLabel.Text = "Victims:\n"
 KillCountLabel.TextWrapped = true
 KillCountLabel.TextXAlignment = Enum.TextXAlignment.Left
 KillCountLabel.TextYAlignment = Enum.TextYAlignment.Top
@@ -86,11 +86,11 @@ ProgressBar.Parent = ProgressBackground
 local function toggleKilling()
 	isKilling = not isKilling
 	if isKilling then
-		ToggleButton.Text = "Стоп"
+		ToggleButton.Text = "Stop Kill"
 		ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 		lastKillTime = tick()
 	else
-		ToggleButton.Text = "Начать убийство"
+		ToggleButton.Text = "Start Kill"
 		ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
 	end
 end
