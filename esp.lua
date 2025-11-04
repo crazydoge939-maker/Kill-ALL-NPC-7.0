@@ -13,7 +13,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game.CoreGui
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 300, 0, 250)
+Frame.Size = UDim2.new(0, 300, 0, 180)
 Frame.Position = UDim2.new(0, 20, 0, 20)
 Frame.BackgroundColor3 = Color3.fromRGB(40, 44, 52)
 Frame.BorderSizePixel = 0
@@ -45,28 +45,28 @@ ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
 ToggleButton.Font = Enum.Font.GothamBold
 ToggleButton.TextSize = 16
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.Text = "Start Kill"
+ToggleButton.Text = "Начать убийство"
 local buttonCorner = Instance.new("UICorner")
 buttonCorner.CornerRadius = UDim.new(0, 8)
 buttonCorner.Parent = ToggleButton
 ToggleButton.Parent = Frame
 
 local KillCountLabel = Instance.new("TextLabel")
-KillCountLabel.Size = UDim2.new(1, -40, 0, 120)
+KillCountLabel.Size = UDim2.new(1, -40, 0, 70)
 KillCountLabel.Position = UDim2.new(0, 20, 0, 95)
 KillCountLabel.BackgroundTransparency = 1
-KillCountLabel.Text = "Victims:\n"
+KillCountLabel.Text = "Жертвы:\n"
 KillCountLabel.TextWrapped = true
 KillCountLabel.TextXAlignment = Enum.TextXAlignment.Left
 KillCountLabel.TextYAlignment = Enum.TextYAlignment.Top
 KillCountLabel.Font = Enum.Font.Gotham
-KillCountLabel.TextSize = 20
+KillCountLabel.TextSize = 14
 KillCountLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 KillCountLabel.Parent = Frame
 
 local ProgressBackground = Instance.new("Frame")
 ProgressBackground.Size = UDim2.new(1, -40, 0, 10)
-ProgressBackground.Position = UDim2.new(0, 20, 0, 230)
+ProgressBackground.Position = UDim2.new(0, 20, 0, 165)
 ProgressBackground.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 ProgressBackground.BorderSizePixel = 0
 local progressCorner = Instance.new("UICorner")
@@ -85,11 +85,11 @@ ProgressBar.Parent = ProgressBackground
 local function toggleKilling()
     isKilling = not isKilling
     if isKilling then
-        ToggleButton.Text = "Stop"
+        ToggleButton.Text = "Стоп"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
         lastKillTime = tick() -- чтобы начать отсчет сразу после запуска
     else
-        ToggleButton.Text = "Start Kill"
+        ToggleButton.Text = "Начать убийство"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
     end
 end
@@ -146,7 +146,7 @@ local function updateKillCount()
     local displayText = "Жертвы:\n"
     for name, count in pairs(killedHumanoidsCount) do
         displayText = displayText .. name
-        if count > 1 then
+        if count &gt; 1 then
             displayText = displayText .. " x" .. count
         end
         displayText = displayText .. "\n"
@@ -184,7 +184,7 @@ local function teleportAndKillAllNPCs()
     -- Убиваем всех NPC
     for _, npcToKill in pairs(findHumanoids()) do
         local humanoid = npcToKill:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.Health > 0 then
+        if humanoid and humanoid.Health &gt; 0 then
             highlightNPC(npcToKill)
             humanoid.Health = 0
         end
@@ -199,7 +199,7 @@ runService.Heartbeat:Connect(function()
         local progress = math.min(elapsed / killInterval, 1)
         ProgressBar.Size = UDim2.new(progress, 0, 1, 0)
 
-        if elapsed >= killInterval then
+        if elapsed &gt;= killInterval then
             -- Каждые killInterval секунд телепортируемся и убиваем всех NPC
             teleportAndKillAllNPCs()
             lastKillTime = currentTime
