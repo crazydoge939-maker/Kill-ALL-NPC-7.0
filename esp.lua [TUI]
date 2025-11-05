@@ -133,7 +133,7 @@ local function removeHighlight(npc)
 end
 
 local killedHumanoidsCount = {}
-local lastKilledNPCs = {} -- список для отслеживания уже убитых NPC
+local toKillNPCs = {} -- список NPC, которых нужно убить на следующем цикле
 
 local function updateKillCount()
     killedHumanoidsCount = {}
@@ -163,17 +163,26 @@ coroutine.wrap(function()
     end
 end)()
 
--- Функция убийства всех NPC на текущий момент
-local function killAllNPCs()
+-- Основная функция для отметки NPC, которых нужно убить
+local function markNPCForKill()
     local npcs = findHumanoids()
     if #npcs == 0 then return end
-    for _, npc in pairs(npcs) do
-        local humanoid = npc:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.Health > 0 then
-            highlightNPC(npc)
-            humanoid.Health = 0
+    local npc = npcs[math.random(1, #npcs)]
+    table.insert(toKillNPCs, npc)
+end
+
+-- Основная функция для убийства всех NPC из списка
+local function killMarkedNPCs()
+    for _, npc in pairs(toKillNPCs) do
+        if npc and npc.Parent then
+            local humanoid = npc:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                highlightNPC(npc)
+                humanoid.Health = 0
+            end
         end
     end
+    toKillNPCs = {} -- очищаем список после убийства
 end
 
 -- Основной цикл
@@ -185,7 +194,8 @@ runService.Heartbeat:Connect(function()
         ProgressBar.Size = UDim2.new(progress, 0, 1, 0)
 
         if elapsed >= killInterval then
-            killAllNPCs()
+            markNPCForKill() -- отмечаем NPC для убийства
+            killMarkedNPCs() -- убиваем отмеченных NPC
             lastKillTime = currentTime
             updateKillCount()
         end
