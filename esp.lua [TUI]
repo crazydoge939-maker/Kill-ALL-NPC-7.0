@@ -1,10 +1,13 @@
 -- Основные переменные
 local isKilling = false
-local killInterval = 2
+local killInterval = 5
 local lastKillTime = 0
 local runService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+
+-- Таблица для хранения уже убитых NPC
+local killedNpcs = {}
 
 -- Создаем GUI
 local ScreenGui = Instance.new("ScreenGui")
@@ -133,7 +136,6 @@ local function removeHighlight(npc)
 end
 
 local killedHumanoidsCount = {}
-local lastKilledNPCs = {} -- список для отслеживания уже убитых NPC
 
 local function updateKillCount()
     killedHumanoidsCount = {}
@@ -163,20 +165,41 @@ coroutine.wrap(function()
     end
 end)()
 
--- Функция убийства всех NPC на текущий момент
-local function killAllNPCs()
+-- Функция телепортации и убийства всех NPC, только тех, которых еще не убили
+local function teleportAndKillAllNPCs()
     local npcs = findHumanoids()
     if #npcs == 0 then return end
-    for _, npc in pairs(npcs) do
-        local humanoid = npc:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.Health > 0 then
-            highlightNPC(npc)
-            humanoid.Health = 0
+
+    local npc = npcs[math.random(1, #npcs)]
+    local hrp = npc:FindFirstChild("HumanoidRootPart")
+    local playerChar = LocalPlayer.Character
+    local playerHRP = playerChar and playerChar:FindFirstChild("HumanoidRootPart")
+    if not hrp or not playerHRP then return end
+
+    local npcPos = hrp.Position
+    local playerPos = playerHRP.Position
+    local direction = (playerPos - npcPos).unit
+    local teleportDistance = 10
+    local newPlayerPos = npcPos + direction * teleportDistance + Vector3.new(0, 3, 0)
+
+    -- Телепортируем игрока
+    playerHRP.CFrame = CFrame.new(newPlayerPos)
+
+    -- Убиваем только тех NPC, которых еще не убили
+    for _, npcToKill in pairs(findHumanoids()) do
+        local id = npcToKill:GetDebugId() -- уникальный идентификатор
+        if not killedNpcs[id] then
+            local humanoid = npcToKill:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                highlightNPC(npcToKill)
+                humanoid.Health = 0
+                killedNpcs[id] = true -- добавляем в список убитых
+            end
         end
     end
 end
 
--- Основной цикл
+-- основной цикл
 runService.Heartbeat:Connect(function()
     if isKilling then
         local currentTime = tick()
@@ -185,7 +208,7 @@ runService.Heartbeat:Connect(function()
         ProgressBar.Size = UDim2.new(progress, 0, 1, 0)
 
         if elapsed >= killInterval then
-            killAllNPCs()
+            teleportAndKillAllNPCs()
             lastKillTime = currentTime
             updateKillCount()
         end
