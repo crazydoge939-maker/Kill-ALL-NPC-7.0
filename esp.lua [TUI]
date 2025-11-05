@@ -8,6 +8,8 @@ local LocalPlayer = Players.LocalPlayer
 
 -- Таблица для хранения уже убитых NPC
 local killedNpcs = {}
+-- Таблица для подсчета циклов появления NPC
+local npcDeathCounter = {}
 
 -- Создаем GUI
 local ScreenGui = Instance.new("ScreenGui")
@@ -35,7 +37,7 @@ UIGradient.Parent = Frame
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
-Title.Text = "Auto Killer"
+Title.Text = "Auto Killer NPC"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 20
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -165,7 +167,7 @@ coroutine.wrap(function()
     end
 end)()
 
--- Функция телепортации и убийства всех NPC, только тех, которых еще не убили
+-- Функция телепортации и убийства всех NPC, только тех, которых еще не убили или прошли 3 цикла
 local function teleportAndKillAllNPCs()
     local npcs = findHumanoids()
     if #npcs == 0 then return end
@@ -185,15 +187,24 @@ local function teleportAndKillAllNPCs()
     -- Телепортируем игрока
     playerHRP.CFrame = CFrame.new(newPlayerPos)
 
-    -- Убиваем только тех NPC, которых еще не убили
+    -- Убиваем только тех NPC, которых еще не убили и прошло минимум 3 цикла
     for _, npcToKill in pairs(findHumanoids()) do
         local id = npcToKill:GetDebugId() -- уникальный идентификатор
         if not killedNpcs[id] then
-            local humanoid = npcToKill:FindFirstChildOfClass("Humanoid")
-            if humanoid and humanoid.Health > 0 then
-                highlightNPC(npcToKill)
-                humanoid.Health = 0
-                killedNpcs[id] = true -- добавляем в список убитых
+            -- Если NPC появляется впервые, сбрасываем счетчик
+            if not npcDeathCounter[id] then
+                npcDeathCounter[id] = 0
+            end
+            -- Увеличиваем счетчик циклов
+            npcDeathCounter[id] = npcDeathCounter[id] + 1
+            -- Убиваем только после 3-х циклов
+            if npcDeathCounter[id] >= 3 then
+                local humanoid = npcToKill:FindFirstChildOfClass("Humanoid")
+                if humanoid and humanoid.Health > 0 then
+                    highlightNPC(npcToKill)
+                    humanoid.Health = 0
+                    killedNpcs[id] = true -- добавляем в список убитых
+                end
             end
         end
     end
