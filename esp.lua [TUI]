@@ -1,15 +1,10 @@
 -- Основные переменные
 local isKilling = false
-local killInterval = 5
+local killInterval = 15
 local lastKillTime = 0
 local runService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-
--- Таблица для хранения уже убитых NPC
-local killedNpcs = {}
--- Таблица для подсчета циклов появления NPC
-local npcDeathCounter = {}
 
 -- Создаем GUI
 local ScreenGui = Instance.new("ScreenGui")
@@ -18,7 +13,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game.CoreGui
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 300, 0, 300)
+Frame.Size = UDim2.new(0, 300, 0, 250)
 Frame.Position = UDim2.new(0, 20, 0, 20)
 Frame.BackgroundColor3 = Color3.fromRGB(40, 44, 52)
 Frame.BorderSizePixel = 0
@@ -37,7 +32,7 @@ UIGradient.Parent = Frame
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
-Title.Text = "Auto Killer NPC"
+Title.Text = "Auto Killer"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 20
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -50,29 +45,29 @@ ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
 ToggleButton.Font = Enum.Font.GothamBold
 ToggleButton.TextSize = 16
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.Text = "Start Kill"
+ToggleButton.Text = "Начать убийство"
 local buttonCorner = Instance.new("UICorner")
 buttonCorner.CornerRadius = UDim.new(0, 8)
 buttonCorner.Parent = ToggleButton
 ToggleButton.Parent = Frame
 
 local KillCountLabel = Instance.new("TextLabel")
-KillCountLabel.Size = UDim2.new(1, -40, 0, 120)
+KillCountLabel.Size = UDim2.new(1, -40, 0, 120) -- увеличено, чтобы вместить 10 строк
 KillCountLabel.Position = UDim2.new(0, 20, 0, 95)
 KillCountLabel.BackgroundTransparency = 1
-KillCountLabel.Text = "Victims:\n"
+KillCountLabel.Text = "Жертвы:\n"
 KillCountLabel.TextWrapped = true
 KillCountLabel.TextXAlignment = Enum.TextXAlignment.Left
 KillCountLabel.TextYAlignment = Enum.TextYAlignment.Top
 KillCountLabel.Font = Enum.Font.Gotham
-KillCountLabel.TextSize = 20
+KillCountLabel.TextSize = 20 -- увеличено для читаемости
 KillCountLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 KillCountLabel.Parent = Frame
 
 -- Линия прогресса расположена ниже логов
 local ProgressBackground = Instance.new("Frame")
 ProgressBackground.Size = UDim2.new(1, -40, 0, 10)
-ProgressBackground.Position = UDim2.new(0, 20, 0, 270)
+ProgressBackground.Position = UDim2.new(0, 20, 0, 230) -- перемещено ниже логов
 ProgressBackground.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 ProgressBackground.BorderSizePixel = 0
 local progressCorner = Instance.new("UICorner")
@@ -91,11 +86,11 @@ ProgressBar.Parent = ProgressBackground
 local function toggleKilling()
     isKilling = not isKilling
     if isKilling then
-        ToggleButton.Text = "Stop Kill"
+        ToggleButton.Text = "Стоп"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
         lastKillTime = tick()
     else
-        ToggleButton.Text = "Start Kill"
+        ToggleButton.Text = "Начать убийство"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
     end
 end
@@ -149,10 +144,10 @@ local function updateKillCount()
             killedHumanoidsCount[name] = 1
         end
     end
-    local displayText = "Victims:\n"
+    local displayText = "Жертвы:\n"
     for name, count in pairs(killedHumanoidsCount) do
         displayText = displayText .. name
-        if count > 1 then
+        if count &gt; 1 then
             displayText = displayText .. " x" .. count
         end
         displayText = displayText .. "\n"
@@ -167,11 +162,10 @@ coroutine.wrap(function()
     end
 end)()
 
--- Функция телепортации и убийства всех NPC, только тех, которых еще не убили или прошли 3 цикла
+-- Функция телепортации и убийства всех NPC
 local function teleportAndKillAllNPCs()
     local npcs = findHumanoids()
     if #npcs == 0 then return end
-
     local npc = npcs[math.random(1, #npcs)]
     local hrp = npc:FindFirstChild("HumanoidRootPart")
     local playerChar = LocalPlayer.Character
@@ -187,30 +181,17 @@ local function teleportAndKillAllNPCs()
     -- Телепортируем игрока
     playerHRP.CFrame = CFrame.new(newPlayerPos)
 
-    -- Убиваем только тех NPC, которых еще не убили и прошло минимум 3 цикла
+    -- Убиваем всех NPC
     for _, npcToKill in pairs(findHumanoids()) do
-        local id = npcToKill:GetDebugId() -- уникальный идентификатор
-        if not killedNpcs[id] then
-            -- Если NPC появляется впервые, сбрасываем счетчик
-            if not npcDeathCounter[id] then
-                npcDeathCounter[id] = 0
-            end
-            -- Увеличиваем счетчик циклов
-            npcDeathCounter[id] = npcDeathCounter[id] + 1
-            -- Убиваем только после 3-х циклов
-            if npcDeathCounter[id] >= 3 then
-                local humanoid = npcToKill:FindFirstChildOfClass("Humanoid")
-                if humanoid and humanoid.Health > 0 then
-                    highlightNPC(npcToKill)
-                    humanoid.Health = 0
-                    killedNpcs[id] = true -- добавляем в список убитых
-                end
-            end
+        local humanoid = npcToKill:FindFirstChildOfClass("Humanoid")
+        if humanoid and humanoid.Health &gt; 0 then
+            highlightNPC(npcToKill)
+            humanoid.Health = 0
         end
     end
 end
 
--- основной цикл
+-- Основной цикл
 runService.Heartbeat:Connect(function()
     if isKilling then
         local currentTime = tick()
@@ -218,7 +199,7 @@ runService.Heartbeat:Connect(function()
         local progress = math.min(elapsed / killInterval, 1)
         ProgressBar.Size = UDim2.new(progress, 0, 1, 0)
 
-        if elapsed >= killInterval then
+        if elapsed &gt;= killInterval then
             teleportAndKillAllNPCs()
             lastKillTime = currentTime
             updateKillCount()
