@@ -122,8 +122,8 @@ local function updateHighlights()
 				highlight = Instance.new("Highlight")
 				highlight.Name = "Highlight"
 				highlight.Adornee = npc
-				highlight.FillColor = Color3.fromRGB(85, 0, 0)
-				highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+				highlight.FillColor = Color3.fromRGB(255, 0, 0)
+				highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
 				highlight.Parent = npc
 				npcHighlights[npc] = highlight
 			end
@@ -140,27 +140,21 @@ coroutine.wrap(function()
 	end
 end)()
 
-local npcCounts = {} -- таблица для хранения счетчиков по конкретным NPC
+local killedHumanoidsCount = {}
 
 local function updateKillCount()
-	-- Обнуляем все счетчики перед подсчетом новых
-	for npc, _ in pairs(npcCounts) do
-		npcCounts[npc] = (npcCounts[npc] or 0)
-	end
-
-	-- Подсчитываем убийства
+	killedHumanoidsCount = {}
 	for _, npc in pairs(findHumanoids()) do
-		if not npcCounts[npc] then
-			npcCounts[npc] = 1
+		local name = npc.Name
+		if killedHumanoidsCount[name] then
+			killedHumanoidsCount[name] = killedHumanoidsCount[name] + 1
 		else
-			npcCounts[npc] = npcCounts[npc] + 1
+			killedHumanoidsCount[name] = 1
 		end
 	end
-
-	-- Формируем строку для отображения
 	local displayText = "Жертвы:\n"
-	for npc, count in pairs(npcCounts) do
-		displayText = displayText .. npc.Name
+	for name, count in pairs(killedHumanoidsCount) do
+		displayText = displayText .. name
 		if count > 1 then
 			displayText = displayText .. " x" .. count
 		end
@@ -199,7 +193,7 @@ runService.Heartbeat:Connect(function()
 
 		if elapsed >= killInterval then
 			cycleCount = cycleCount + 1
-			if cycleCount >= 5 then
+			if cycleCount >= 3 then
 				killAllHumanoids()
 				cycleCount = 0 -- сбрасываем счетчик после убийства новых NPC
 			end
