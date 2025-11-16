@@ -25,8 +25,8 @@ UIStroke.Parent = Frame
 
 local UIGradient = Instance.new("UIGradient")
 UIGradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 54, 62)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 34, 42))
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 54, 62)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 34, 42))
 }
 UIGradient.Parent = Frame
 
@@ -85,124 +85,124 @@ progressInnerCorner.CornerRadius = UDim.new(0, 5)
 ProgressBar.Parent = ProgressBackground
 
 local function toggleKilling()
-    isKilling = not isKilling
-    if isKilling then
-        ToggleButton.Text = "Stop Kill"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        lastKillTime = tick()
-        cycleCount = 0 -- сбрасываем счетчик при запуске
-    else
-        ToggleButton.Text = "Start Kill"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-    end
+	isKilling = not isKilling
+	if isKilling then
+		ToggleButton.Text = "Stop Kill"
+		ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+		lastKillTime = tick()
+		cycleCount = 0 -- сбрасываем счетчик при запуске
+	else
+		ToggleButton.Text = "Start Kill"
+		ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+	end
 end
 
 ToggleButton.MouseButton1Click:Connect(toggleKilling)
 
 local function findHumanoids()
-    local npcs = {}
-    for _, v in pairs(workspace:GetDescendants()) do
-        if v:IsA("Humanoid") and v.Parent and v.Parent:FindFirstChildOfClass("Humanoid") then
-            if not game.Players:GetPlayerFromCharacter(v.Parent) then
-                table.insert(npcs, v.Parent)
-            end
-        end
-    end
-    return npcs
+	local npcs = {}
+	for _, v in pairs(workspace:GetDescendants()) do
+		if v:IsA("Humanoid") and v.Parent and v.Parent:FindFirstChildOfClass("Humanoid") then
+			if not game.Players:GetPlayerFromCharacter(v.Parent) then
+				table.insert(npcs, v.Parent)
+			end
+		end
+	end
+	return npcs
 end
 
 local npcHighlights = {}
 
 local function updateHighlights()
-    local npcs = findHumanoids()
-    for _, npc in pairs(npcs) do
-        if npc then
-            local highlight = npcHighlights[npc]
-            if not highlight then
-                highlight = Instance.new("Highlight")
-                highlight.Name = "Highlight"
-                highlight.Adornee = npc
-                highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
-                highlight.Parent = npc
-                npcHighlights[npc] = highlight
-            end
-            highlight.Enabled = true
-        end
-    end
+	local npcs = findHumanoids()
+	for _, npc in pairs(npcs) do
+		if npc then
+			local highlight = npcHighlights[npc]
+			if not highlight then
+				highlight = Instance.new("Highlight")
+				highlight.Name = "Highlight"
+				highlight.Adornee = npc
+				highlight.FillColor = Color3.fromRGB(85, 0, 0)
+				highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+				highlight.Parent = npc
+				npcHighlights[npc] = highlight
+			end
+			highlight.Enabled = true
+		end
+	end
 end
 
 -- Постоянное обновление подсветки
 coroutine.wrap(function()
-    while true do
-        wait(1)
-        updateHighlights()
-    end
+	while true do
+		wait(1)
+		updateHighlights()
+	end
 end)()
 
 local killedHumanoidsCount = {}
 
 local function updateKillCount()
-    killedHumanoidsCount = {}
-    for _, npc in pairs(findHumanoids()) do
-        local name = npc.Name
-        if killedHumanoidsCount[name] then
-            killedHumanoidsCount[name] = killedHumanoidsCount[name] + 1
-        else
-            killedHumanoidsCount[name] = 1
-        end
-    end
-    local displayText = "Жертвы:\n"
-    for name, count in pairs(killedHumanoidsCount) do
-        displayText = displayText .. name
-        if count > 1 then
-            displayText = displayText .. " x" .. count
-        end
-        displayText = displayText .. "\n"
-    end
-    KillCountLabel.Text = displayText
+	killedHumanoidsCount = {}
+	for _, npc in pairs(findHumanoids()) do
+		local name = npc.Name
+		if killedHumanoidsCount[name] then
+			killedHumanoidsCount[name] = killedHumanoidsCount[name] + 1
+		else
+			killedHumanoidsCount[name] = 1
+		end
+	end
+	local displayText = "Жертвы:\n"
+	for name, count in pairs(killedHumanoidsCount) do
+		displayText = displayText .. name
+		if count > 1 then
+			displayText = displayText .. " x" .. count
+		end
+		displayText = displayText .. "\n"
+	end
+	KillCountLabel.Text = displayText
 end
 
 coroutine.wrap(function()
-    while true do
-        wait(0.5)
-        updateKillCount()
-    end
+	while true do
+		wait(0.5)
+		updateKillCount()
+	end
 end)()
 
 local function killAllHumanoids()
-    for _, npc in pairs(findHumanoids()) do
-        local humanoid = npc:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.Health > 0 then
-            local highlight = npcHighlights[npc]
-            if highlight then
-                highlight.Enabled = true
-            end
-            humanoid.Health = 0
-        end
-    end
+	for _, npc in pairs(findHumanoids()) do
+		local humanoid = npc:FindFirstChildOfClass("Humanoid")
+		if humanoid and humanoid.Health > 0 then
+			local highlight = npcHighlights[npc]
+			if highlight then
+				highlight.Enabled = true
+			end
+			humanoid.Health = 0
+		end
+	end
 end
 
 -- Основной цикл
 runService.Heartbeat:Connect(function()
-    if isKilling then
-        local currentTime = tick()
-        local elapsed = currentTime - lastKillTime
-        local progress = math.min(elapsed / killInterval, 1)
-        ProgressBar.Size = UDim2.new(progress, 0, 1, 0)
+	if isKilling then
+		local currentTime = tick()
+		local elapsed = currentTime - lastKillTime
+		local progress = math.min(elapsed / killInterval, 1)
+		ProgressBar.Size = UDim2.new(progress, 0, 1, 0)
 
-        if elapsed >= killInterval then
-            cycleCount = cycleCount + 1
-            if cycleCount >= 5 then
-                killAllHumanoids()
-                cycleCount = 0 -- сбрасываем счетчик после убийства новых NPC
-            end
-            lastKillTime = currentTime
-            updateKillCount()
-        end
-    else
-        ProgressBar.Size = UDim2.new(0, 0, 1, 0)
-    end
+		if elapsed >= killInterval then
+			cycleCount = cycleCount + 1
+			if cycleCount >= 5 then
+				killAllHumanoids()
+				cycleCount = 0 -- сбрасываем счетчик после убийства новых NPC
+			end
+			lastKillTime = currentTime
+			updateKillCount()
+		end
+	else
+		ProgressBar.Size = UDim2.new(0, 0, 1, 0)
+	end
 end)
 
 -- Перетаскивание GUI
@@ -211,22 +211,22 @@ local dragStart
 local startPos
 
 Frame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = Frame.Position
-    end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = Frame.Position
+	end
 end)
 
 Frame.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = false
+	end
 end)
 
 Frame.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - dragStart
-        Frame.Position = startPos + UDim2.new(0, delta.X, 0, delta.Y)
-    end
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - dragStart
+		Frame.Position = startPos + UDim2.new(0, delta.X, 0, delta.Y)
+	end
 end)
