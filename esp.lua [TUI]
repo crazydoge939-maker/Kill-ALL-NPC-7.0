@@ -1,8 +1,6 @@
-
 -- Основные переменные
 local isKilling = false
-local killInterval = 5
-local lastKillTime = 0
+local killInterval = 15 -- интервал в секундах
 local runService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -65,7 +63,6 @@ KillCountLabel.TextSize = 20
 KillCountLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 KillCountLabel.Parent = Frame
 
--- Линия прогресса расположена ниже логов
 local ProgressBackground = Instance.new("Frame")
 ProgressBackground.Size = UDim2.new(1, -40, 0, 10)
 ProgressBackground.Position = UDim2.new(0, 20, 0, 270)
@@ -98,6 +95,11 @@ end
 
 ToggleButton.MouseButton1Click:Connect(toggleKilling)
 
+-- Таблицы для NPC
+local npcHighlight = {} -- подсветка NPC + счетчик
+local killedCounts = {} -- счетчик убийств по именам
+
+-- Функция поиска NPC
 local function findHumanoids()
     local npcs = {}
     for _, v in pairs(workspace:GetDescendants()) do
@@ -110,28 +112,20 @@ local function findHumanoids()
     return npcs
 end
 
-local npcHighlights = {} -- таблица для хранения подсветки всех NPC
-local npcTimers = {} -- таблица для хранения таймеров появления NPC
-
+-- Обновление подсветки
 local function updateHighlights()
     local npcs = findHumanoids()
     for _, npc in pairs(npcs) do
-        if npc then
-            if not npcTimers[npc] then
-                npcTimers[npc] = tick() -- запоминаем время появления
-            end
-            local highlight = npcHighlights[npc]
-            if not highlight then
-                highlight = Instance.new("Highlight")
-                highlight.Name = "Highlight"
-                highlight.Adornee = npc
-                highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
-                highlight.Parent = npc
-                npcHighlights[npc] = highlight
-            end
-            highlight.Enabled = true
+        if not npcHighlight[npc] then
+            local hl = Instance.new("Highlight")
+            hl.Name = "Highlight"
+            hl.Adornee = npc
+            hl.FillColor = Color3.fromRGB(255, 0, 0)
+            hl.OutlineColor = Color3.fromRGB(255, 255, 0)
+            hl.Parent = npc
+            npcHighlight[npc] = {Highlight=hl, Counter=0}
         end
+        npcHighlight[npc].Highlight.Enabled = true
     end
 end
 
@@ -143,46 +137,50 @@ coroutine.wrap(function()
     end
 end)()
 
-local killedHumanoidsCount = {}
-
-local function updateKillCount()
-    killedHumanoidsCount = {}
-    for _, npc in pairs(findHumanoids()) do
-        local name = npc.Name
-        if killedHumanoidsCount[name] then
-            killedHumanoidsCount[name] = killedHumanoidsCount[name] + 1
-        else
-            killedHumanoidsCount[name] = 1
+-- Обновление счетчиков для NPC
+local function updateNPCCounters()
+    for npc, data in pairs(npcHighlight) do
+        if data.Counter > 0 then
+            data.Counter = data.Counter - 1
         end
     end
-    local displayText = "Жертвы:\n"
-    for name, count in pairs(killedHumanoidsCount) do
-        displayText = displayText .. name
-        if count > 1 then
-            displayText = displayText .. " x" .. count
-        end
-        displayText = displayText .. "\n"
-    end
-    KillCountLabel.Text = displayText
 end
 
-coroutine.wrap(function()
-    while true do
-        wait(0.5)
-        updateKillCount()
-    end
-end)()
-
--- Функция убийства всех NPC (без телепортации)
-local function killAllHumanoids()
-    for _, npc in pairs(findHumanoids()) do
-        local humanoid = npc:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.Health > 0 then
-            local highlight = npcHighlights[npc]
-            if highlight then
-                highlight.Enabled = true
+-- Убить NPC, у которых счетчик равен 0
+local function killMarkedNPCs()
+    for npc, data in pairs(npcHighlight) do
+        if data.Counter <= 0 then
+            local humanoid = npc:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                -- Увеличиваем счетчик убийств по имени
+                local name = npc.Name
+                killedCounts[name] = (killedCounts[name] or 0) + 1
+                humanoid.Health = 0
             end
-            humanoid.Health = 0
+            -- После убийства можно отключить подсветку или оставить
+            data.Highlight.Enabled = false
+            data.Counter = -1 -- чтобы не убивать вновь
+        end
+    end
+end
+
+-- Обновление новых NPC и их счетчиков
+local function refreshNPCs()
+    local npcs = findHumanoids()
+    for _, npc in pairs(npcs) do
+        if not npcHighlight[npc] then
+            local hl = Instance.new("Highlight")
+            hl.Name = "Highlight"
+            hl.Adornee = npc
+            hl.FillColor = Color3.fromRGB(255, 0, 0)
+            hl.OutlineColor = Color3.fromRGB(255, 255, 0)
+            hl.Parent = npc
+            npcHighlight[npc] = {Highlight=hl, Counter=killInterval * 5}
+        else
+            -- если NPC уже есть, то просто обновляем его счетчик
+            if npcHighlight[npc].Counter < killInterval * 5 then
+                npcHighlight[npc].Counter = killInterval * 5
+            end
         end
     end
 end
@@ -196,29 +194,17 @@ runService.Heartbeat:Connect(function()
         ProgressBar.Size = UDim2.new(progress, 0, 1, 0)
 
         if elapsed >= killInterval then
-            -- Убиваем только новых NPC, у которых прошло >= 5 циклов с появления
-            local currentTick = tick()
-            for npc, spawnTime in pairs(npcTimers) do
-                if npc and npc.Parent and npc:FindFirstChildOfClass("Humanoid") then
-                    if npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 then
-                        if (currentTick - spawnTime) >= (killInterval + 0.1) then
-                            -- убиваем NPC
-                            npc.Humanoid.Health = 0
-                            -- обновляем таймер появления
-                            npcTimers[npc] = currentTick
-                        end
-                    end
-                end
-            end
+            killMarkedNPCs()
+            refreshNPCs()
             lastKillTime = currentTime
-            updateKillCount()
+            updateNPCCounters()
         end
     else
         ProgressBar.Size = UDim2.new(0, 0, 1, 0)
     end
 end)
 
--- Перетаскивание GUI
+-- Перетаскивание GUI (оставьте без изменений)
 local dragging = false
 local dragStart
 local startPos
