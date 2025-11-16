@@ -141,10 +141,11 @@ coroutine.wrap(function()
 end)()
 
 local killedHumanoidsCount = {}
+local killedNPCs = {}
 
 local function updateKillCount()
 	killedHumanoidsCount = {}
-	for _, npc in pairs(findHumanoids()) do
+	for npc, _ in pairs(killedNPCs) do
 		local name = npc.Name
 		if killedHumanoidsCount[name] then
 			killedHumanoidsCount[name] = killedHumanoidsCount[name] + 1
@@ -172,13 +173,16 @@ end)()
 
 local function killAllHumanoids()
 	for _, npc in pairs(findHumanoids()) do
-		local humanoid = npc:FindFirstChildOfClass("Humanoid")
-		if humanoid and humanoid.Health > 0 then
-			local highlight = npcHighlights[npc]
-			if highlight then
-				highlight.Enabled = true
+		if not killedNPCs[npc] then
+			local humanoid = npc:FindFirstChildOfClass("Humanoid")
+			if humanoid and humanoid.Health > 0 then
+				local highlight = npcHighlights[npc]
+				if highlight then
+					highlight.Enabled = true
+				end
+				humanoid.Health = 0
+				killedNPCs[npc] = true
 			end
-			humanoid.Health = 0
 		end
 	end
 end
