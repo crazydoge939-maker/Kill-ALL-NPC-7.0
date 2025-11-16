@@ -120,8 +120,8 @@ local function updateHighlights()
                 highlight = Instance.new("Highlight")
                 highlight.Name = "Highlight"
                 highlight.Adornee = npc
-                highlight.FillColor = Color3.fromRGB(85, 0, 0)
-                highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+                highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
                 highlight.Parent = npc
                 npcHighlights[npc] = highlight
             end
@@ -168,41 +168,22 @@ coroutine.wrap(function()
     end
 end)()
 
--- Урон NPC до 50%
-local function weakenHumanoids()
-    for _, npc in pairs(findHumanoids()) do
-        local humanoid = npc:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.Health > 0 then
-            humanoid.Health = humanoid.MaxHealth * 0.5
-        end
-    end
-end
-
--- Убивать только движущихся NPC (с их "поджатием" до 50% сначала)
-local function killMovingHumanoids()
+-- Функция нанесения 50% урона NPC
+local function damageMovingHumanoids()
     local npcs = findHumanoids()
     for _, npc in pairs(npcs) do
         local humanoid = npc:FindFirstChildOfClass("Humanoid")
         local hrp = npc:FindFirstChild("HumanoidRootPart")
         if humanoid and humanoid.Health > 0 and hrp then
+            -- Проверяем скорость NPC
             local velocity = hrp.AssemblyLinearVelocity
             local speed = velocity.Magnitude
+            -- Порог скорости для движения
             if speed > 1 then
-                -- сначала понизим здоровье до 50%
-                if humanoid.Health > humanoid.MaxHealth * 0.5 then
-                    humanoid.Health = humanoid.MaxHealth * 0.5
-                end
+                -- Наносим 50% текущего здоровья
+                local damageAmount = humanoid.Health * 0.5
+                humanoid.Health = math.max(humanoid.Health - damageAmount, 0)
             end
-        end
-    end
-end
-
-local function killFully()
-    -- убиваем всех, кто на 50% здоровья
-    for _, npc in pairs(findHumanoids()) do
-        local humanoid = npc:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.Health > 0 then
-            humanoid.Health = 0
         end
     end
 end
@@ -216,10 +197,7 @@ runService.Heartbeat:Connect(function()
         ProgressBar.Size = UDim2.new(progress, 0, 1, 0)
 
         if elapsed >= killInterval then
-            killMovingHumanoids()
-            -- через короткое время (после уменьшения до 50%) убиваем полностью
-            wait(0.1)
-            killFully()
+            damageMovingHumanoids()
             lastKillTime = currentTime
             updateKillCount()
         end
