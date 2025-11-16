@@ -1,11 +1,9 @@
 
+
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
 local lastKillTime = 0
-local cycleCounts = {} -- таблица для учета циклов каждого NPC
-local npcTimers = {} -- таблица для учета времени появления каждого NPC
-
 local runService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -172,16 +170,24 @@ coroutine.wrap(function()
     end
 end)()
 
--- Функция убийства всех NPC
-local function killAllHumanoids()
-    for _, npc in pairs(findHumanoids()) do
+-- Функция убийства движущихся NPC
+local function killMovingHumanoids()
+    local npcs = findHumanoids()
+    for _, npc in pairs(npcs) do
         local humanoid = npc:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.Health > 0 then
-            local highlight = npcHighlights[npc]
-            if highlight then
-                highlight.Enabled = true
+        local hrp = npc:FindFirstChild("HumanoidRootPart")
+        if humanoid and humanoid.Health > 0 and hrp then
+            -- Проверяем скорость NPC
+            local velocity = hrp.AssemblyLinearVelocity
+            local speed = velocity.Magnitude
+            -- Устанавливаем порог скорости, например, 1
+            if speed > 1 then
+                local highlight = npcHighlights[npc]
+                if highlight then
+                    highlight.Enabled = true
+                end
+                humanoid.Health = 0
             end
-            humanoid.Health = 0
         end
     end
 end
@@ -195,36 +201,7 @@ runService.Heartbeat:Connect(function()
         ProgressBar.Size = UDim2.new(progress, 0, 1, 0)
 
         if elapsed >= killInterval then
-            -- убиваем новых NPC, у каждого свой счетчик и таймер
-            for _, npc in pairs(findHumanoids()) do
-                local name = npc.Name
-                if not cycleCounts[npc] then
-                    cycleCounts[npc] = 0
-                    npcTimers[npc] = tick()
-                end
-
-                -- Проверка, прошло ли 5 циклов для этого NPC
-                if cycleCounts[npc] >= 5 then
-                    local humanoid = npc:FindFirstChildOfClass("Humanoid")
-                    if humanoid and humanoid.Health > 0 then
-                        local highlight = npcHighlights[npc]
-                        if highlight then
-                            highlight.Enabled = true
-                        end
-                        humanoid.Health = 0
-                    end
-                    -- сбрасываем счетчик после убийства
-                    cycleCounts[npc] = 0
-                    npcTimers[npc] = tick()
-                end
-            end
-            -- увеличиваем счетчик для всех NPC
-            for npc, count in pairs(cycleCounts) do
-                if tick() - npcTimers[npc] >= 1 then -- считаем за 1 цикл
-                    cycleCounts[npc] = (cycleCounts[npc] or 0) + 1
-                    npcTimers[npc] = tick()
-                end
-            end
+            killMovingHumanoids()
             lastKillTime = currentTime
             updateKillCount()
         end
