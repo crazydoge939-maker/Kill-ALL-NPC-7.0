@@ -2,6 +2,7 @@
 local isKilling = false
 local killInterval = 5
 local lastKillTime = 0
+local cycleCount = 0 -- счетчик циклов
 local runService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -64,7 +65,7 @@ KillCountLabel.TextSize = 20
 KillCountLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 KillCountLabel.Parent = Frame
 
--- Линия прогресса расположена ниже логов
+-- Линия прогресса
 local ProgressBackground = Instance.new("Frame")
 ProgressBackground.Size = UDim2.new(1, -40, 0, 10)
 ProgressBackground.Position = UDim2.new(0, 20, 0, 270)
@@ -89,6 +90,7 @@ local function toggleKilling()
         ToggleButton.Text = "Stop Kill"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
         lastKillTime = tick()
+        cycleCount = 0 -- сбрасываем счетчик при запуске
     else
         ToggleButton.Text = "Start Kill"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
@@ -109,7 +111,7 @@ local function findHumanoids()
     return npcs
 end
 
-local npcHighlights = {} -- таблица для хранения подсветки всех NPC
+local npcHighlights = {}
 
 local function updateHighlights()
     local npcs = findHumanoids()
@@ -168,14 +170,13 @@ coroutine.wrap(function()
     end
 end)()
 
--- Функция убийства всех NPC (без телепортации)
 local function killAllHumanoids()
     for _, npc in pairs(findHumanoids()) do
         local humanoid = npc:FindFirstChildOfClass("Humanoid")
         if humanoid and humanoid.Health > 0 then
             local highlight = npcHighlights[npc]
             if highlight then
-                highlight.Enabled = true -- убедимся, что подсветка включена
+                highlight.Enabled = true
             end
             humanoid.Health = 0
         end
@@ -191,7 +192,11 @@ runService.Heartbeat:Connect(function()
         ProgressBar.Size = UDim2.new(progress, 0, 1, 0)
 
         if elapsed >= killInterval then
-            killAllHumanoids()
+            cycleCount = cycleCount + 1
+            if cycleCount >= 3 then
+                killAllHumanoids()
+                cycleCount = 0 -- сбрасываем счетчик после убийства новых NPC
+            end
             lastKillTime = currentTime
             updateKillCount()
         end
