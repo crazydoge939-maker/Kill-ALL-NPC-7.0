@@ -193,7 +193,7 @@ runService.Heartbeat:Connect(function()
 
 		if elapsed >= killInterval then
 			cycleCount = cycleCount + 1
-			if cycleCount >= 3 then
+			if cycleCount >= 5 then
 				killAllHumanoids()
 				cycleCount = 0 -- сбрасываем счетчик после убийства новых NPC
 			end
