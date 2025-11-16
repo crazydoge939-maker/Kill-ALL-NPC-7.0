@@ -1,6 +1,6 @@
 -- Основные переменные
 local isKilling = false
-local killInterval = 15 -- интервал в секундах
+local killInterval = 5 -- интервал в секундах
 local runService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
