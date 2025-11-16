@@ -1,3 +1,5 @@
+
+
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
@@ -175,14 +177,18 @@ local function damageMovingHumanoids()
         local humanoid = npc:FindFirstChildOfClass("Humanoid")
         local hrp = npc:FindFirstChild("HumanoidRootPart")
         if humanoid and humanoid.Health > 0 and hrp then
-            -- Проверяем скорость NPC
+            -- Проверка скорости NPC
             local velocity = hrp.AssemblyLinearVelocity
             local speed = velocity.Magnitude
-            -- Порог скорости для движения
             if speed > 1 then
-                -- Наносим 50% текущего здоровья
-                local damageAmount = humanoid.Health * 0.5
-                humanoid.Health = math.max(humanoid.Health - damageAmount, 0)
+                -- Наносим урон 50% от текущего здоровья
+                local damage = humanoid.Health * 0.5
+                humanoid.Health = humanoid.Health - damage
+                -- Обновляем подсветку
+                local highlight = npcHighlights[npc]
+                if highlight then
+                    highlight.Enabled = true
+                end
             end
         end
     end
