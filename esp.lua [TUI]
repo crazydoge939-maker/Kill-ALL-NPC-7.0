@@ -1,3 +1,4 @@
+
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
@@ -262,23 +263,33 @@ coroutine.wrap(function()
 end)()
 
 -- Функция убийства движущихся NPC
+local function isNpcAlive(npc)
+	local humanoid = npc:FindFirstChildOfClass("Humanoid")
+	local hrp = npc:FindFirstChild("HumanoidRootPart")
+	return humanoid and humanoid.Health > 0 and hrp
+end
+
 local function killMovingHumanoids()
 	local npcs = findHumanoids()
 	for _, npc in pairs(npcs) do
-		local humanoid = npc:FindFirstChildOfClass("Humanoid")
-		local hrp = npc:FindFirstChild("HumanoidRootPart")
-		if humanoid and humanoid.Health > 0 and hrp then
-			-- Проверяем скорость NPC
+		if isNpcAlive(npc) then
+			local humanoid = npc:FindFirstChildOfClass("Humanoid")
+			local hrp = npc:FindFirstChild("HumanoidRootPart")
 			local velocity = hrp.AssemblyLinearVelocity
 			local speed = velocity.Magnitude
-			-- Устанавливаем порог скорости, например, 1
 			if speed > 1 then
 				local highlight = npcHighlights[npc]
 				if highlight then
 					highlight.Enabled = true
 				end
 				humanoid.Health = 0
-				removeLine(npc)
+				-- удаляем линию сразу после убийства
+				if npcLines[npc] then
+					npcLines[npc].Beam:Destroy()
+					npcLines[npc].Attachment0:Destroy()
+					npcLines[npc].Attachment1:Destroy()
+					npcLines[npc] = nil
+				end
 			end
 		end
 	end
@@ -301,7 +312,6 @@ runService.Heartbeat:Connect(function()
 		ProgressBar.Size = UDim2.new(0, 0, 1, 0)
 	end
 
-	-- Обновление линий
 	local playerCharacter = LocalPlayer.Character
 	if not playerCharacter then return end
 	local hrp = playerCharacter:FindFirstChild("HumanoidRootPart")
@@ -310,14 +320,12 @@ runService.Heartbeat:Connect(function()
 
 	for npc, highlight in pairs(npcHighlights) do
 		if highlight.Enabled then
-			if npc and npc.Parent and npc:FindFirstChildOfClass("Humanoid") and npc:FindFirstChild("HumanoidRootPart") then
+			if isNpcAlive(npc) then
 				local lineData = npcLines[npc]
 				if lineData then
-					-- Обновляем целевые позиции
 					lineData.TargetPos0 = playerPos
 					lineData.TargetPos1 = npc.HumanoidRootPart.Position
 
-					-- Плавное перемещение Attachment к целевым позициям
 					local currentPos0 = lineData.Attachment0.WorldPosition
 					local newPos0 = currentPos0:Lerp(lineData.TargetPos0, smoothingFactor)
 					lineData.Attachment0.WorldPosition = newPos0
@@ -327,19 +335,33 @@ runService.Heartbeat:Connect(function()
 					lineData.Attachment1.WorldPosition = newPos1
 				end
 			else
-				-- NPC мертв или исчез — удаляем линию
-				removeLine(npc)
+				-- NPC умер или исчез — удаляем линию и подсветку
+				if npcLines[npc] then
+					npcLines[npc].Beam:Destroy()
+					npcLines[npc].Attachment0:Destroy()
+					npcLines[npc].Attachment1:Destroy()
+					npcLines[npc] = nil
+				end
+				highlight.Enabled = false
 			end
 		else
 			-- подсветка отключена, удаляем линию
-			removeLine(npc)
+			if npcLines[npc] then
+				npcLines[npc].Beam:Destroy()
+				npcLines[npc].Attachment0:Destroy()
+				npcLines[npc].Attachment1:Destroy()
+				npcLines[npc] = nil
+			end
 		end
 	end
 
-	-- Удаление линий для NPC, которых больше нет или не подсвечены
+	-- Удаляем линии для NPC, которых больше нет или не подсвечены
 	for npc, lineData in pairs(npcLines) do
 		if not npcHighlights[npc] or not npcHighlights[npc].Enabled then
-			removeLine(npc)
+			lineData.Beam:Destroy()
+			lineData.Attachment0:Destroy()
+			lineData.Attachment1:Destroy()
+			npcLines[npc] = nil
 		end
 	end
 end)
