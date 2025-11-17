@@ -1,4 +1,3 @@
-
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
@@ -6,6 +5,12 @@ local lastKillTime = 0
 local runService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+
+-- Список NPC, которых не нужно убивать
+local doNotKillList = {
+	["DJ"] = true,
+	["Mysterious Seller"] = true
+}
 
 -- Создаем GUI
 local ScreenGui = Instance.new("ScreenGui")
@@ -121,12 +126,23 @@ local function updateHighlights()
 				highlight = Instance.new("Highlight")
 				highlight.Name = "Highlight"
 				highlight.Adornee = npc
-				highlight.FillColor = Color3.fromRGB(85, 0, 0)
-				highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+				-- устанавливаем цвет подсветки в зависимости от списка
+				if doNotKillList[npc.Name] then
+					highlight.FillColor = Color3.fromRGB(0, 85, 0) -- зеленый
+					highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
+				else
+					highlight.FillColor = Color3.fromRGB(85, 0, 0) -- красный
+					highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+				end
 				highlight.Parent = npc
 				npcHighlights[npc] = highlight
 			end
-			highlight.Enabled = true
+			-- обновляем статус подсветки
+			if doNotKillList[npc.Name] then
+				npcHighlights[npc].Enabled = true
+			else
+				npcHighlights[npc].Enabled = true
+			end
 		end
 	end
 end
@@ -134,7 +150,7 @@ end
 local lineFolder = Instance.new("Folder", workspace)
 lineFolder.Name = "PlayerToNPCLines"
 
-local function createLine()
+local function createLine(npc)
 	local attachment0 = Instance.new("Attachment")
 	local attachment1 = Instance.new("Attachment")
 
@@ -144,7 +160,12 @@ local function createLine()
 	local beam = Instance.new("Beam")
 	beam.Attachment0 = attachment0
 	beam.Attachment1 = attachment1
-	beam.Color = ColorSequence.new(Color3.new(1, 0, 0))
+	-- устанавливаем цвет линии в зависимости от NPC
+	if npc and npc.Name and doNotKillList[npc.Name] then
+		beam.Color = ColorSequence.new(Color3.fromRGB(0, 255, 0))
+	else
+		beam.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
+	end
 	beam.Width0 = 0.2
 	beam.Width1 = 0.2
 	beam.Transparency = NumberSequence.new(0.5)
@@ -154,12 +175,11 @@ local function createLine()
 		Beam = beam,
 		Attachment0 = attachment0,
 		Attachment1 = attachment1,
-		TargetPos0 = Vector3.new(), -- целевая позиция для Attachment0
-		TargetPos1 = Vector3.new()  -- целевая позиция для Attachment1
+		TargetPos0 = Vector3.new(),
+		TargetPos1 = Vector3.new()
 	}
 end
 
--- Функция проверки, жив ли NPC
 local function isNpcAlive(npc)
 	local humanoid = npc:FindFirstChildOfClass("Humanoid")
 	local hrp = npc:FindFirstChild("HumanoidRootPart")
@@ -167,7 +187,7 @@ local function isNpcAlive(npc)
 end
 
 local npcLines = {}
-local smoothingFactor = 1 -- Чем меньше, тем медленнее перемещение (плавнее)
+local smoothingFactor = 1
 
 local function updateLines()
 	local playerCharacter = LocalPlayer.Character
@@ -181,16 +201,14 @@ local function updateLines()
 			if isNpcAlive(npc) then
 				local lineData = npcLines[npc]
 				if not lineData then
-					lineData = createLine()
+					lineData = createLine(npc) -- передаем npc
 					npcLines[npc] = lineData
 				end
-				-- Обновляем целевые позиции
 				lineData.TargetPos0 = playerPos
 				local npcHrp = npc:FindFirstChild("HumanoidRootPart")
 				if npcHrp then
 					lineData.TargetPos1 = npcHrp.Position
 				end
-				-- Плавное перемещение Attachment к целевым позициям
 				local currentPos0 = lineData.Attachment0.WorldPosition
 				local newPos0 = currentPos0:Lerp(lineData.TargetPos0, smoothingFactor)
 				lineData.Attachment0.WorldPosition = newPos0
@@ -199,7 +217,6 @@ local function updateLines()
 				local newPos1 = currentPos1:Lerp(lineData.TargetPos1, smoothingFactor)
 				lineData.Attachment1.WorldPosition = newPos1
 			else
-				-- NPC умер или исчез — удаляем линию и подсветку
 				if npcLines[npc] then
 					npcLines[npc].Beam:Destroy()
 					npcLines[npc].Attachment0:Destroy()
@@ -211,7 +228,6 @@ local function updateLines()
 				end
 			end
 		else
-			-- подсветка отключена, удаляем линию
 			if npcLines[npc] then
 				npcLines[npc].Beam:Destroy()
 				npcLines[npc].Attachment0:Destroy()
@@ -221,7 +237,6 @@ local function updateLines()
 		end
 	end
 
-	-- Удаляем линии для NPC, которых больше нет или не подсвечены
 	for npc, lineData in pairs(npcLines) do
 		if not npcHighlights[npc] or not npcHighlights[npc].Enabled then
 			lineData.Beam:Destroy()
@@ -242,7 +257,6 @@ local function removeLine(npc)
 	end
 end
 
--- Постоянное обновление подсветки
 coroutine.wrap(function()
 	while true do
 		wait(1)
@@ -285,6 +299,12 @@ local function killMovingHumanoids()
 	local npcs = findHumanoids()
 	for _, npc in pairs(npcs) do
 		if isNpcAlive(npc) then
+			local name = npc.Name
+			-- Проверка, есть ли NPC в списке не убивать
+			if doNotKillList[name] then
+				continue
+			end
+
 			local humanoid = npc:FindFirstChildOfClass("Humanoid")
 			local hrp = npc:FindFirstChild("HumanoidRootPart")
 			local velocity = hrp.AssemblyLinearVelocity
