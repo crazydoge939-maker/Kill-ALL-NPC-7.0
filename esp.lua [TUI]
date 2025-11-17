@@ -1,4 +1,3 @@
-
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
@@ -213,6 +212,20 @@ local function updateLines()
     end
 end
 
+local function removeLineAndHighlight(npc)
+	if npcHighlights[npc] then
+		npcHighlights[npc].Enabled = false
+		npcHighlights[npc]:Destroy()
+		npcHighlights[npc] = nil
+	end
+	if npcLines[npc] then
+		npcLines[npc].Beam:Destroy()
+		npcLines[npc].Attachment0:Destroy()
+		npcLines[npc].Attachment1:Destroy()
+		npcLines[npc] = nil
+	end
+end
+
 -- Постоянное обновление подсветки
 coroutine.wrap(function()
 	while true do
@@ -269,6 +282,7 @@ local function killMovingHumanoids()
 					highlight.Enabled = true
 				end
 				humanoid.Health = 0
+				removeLineAndHighlight(npc)
 			end
 		end
 	end
