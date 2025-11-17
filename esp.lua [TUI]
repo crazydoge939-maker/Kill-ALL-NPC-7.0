@@ -1,13 +1,10 @@
+
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
 local lastKillTime = 0
 local runService = game:GetService("RunService")
 local Players = game:GetService("Players")
-local player = game.Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-local humanoid = character:WaitForChild("Humanoid")
 local LocalPlayer = Players.LocalPlayer
 
 -- Создаем GUI
@@ -87,61 +84,6 @@ local progressInnerCorner = Instance.new("UICorner")
 progressInnerCorner.CornerRadius = UDim.new(0, 5)
 ProgressBar.Parent = ProgressBackground
 
--- Создание Линии
--- Таблицы для линий
-local linesToChests = {}
-local linesToOther = {}
-
-local function createAttachment(parent)
-	local att = Instance.new("Attachment")
-	att.Parent = parent
-	return att
-end
-
-local function createBeam(attachment0, attachment1, color)
-	local beam = Instance.new("Beam")
-	beam.Attachment0 = attachment0
-	beam.Attachment1 = attachment1
-	beam.Color = ColorSequence.new(color)
-	beam.Width0 = 0.2
-	beam.Width1 = 0.2
-	beam.Parent = attachment0.Parent -- или в workspace
-	beam.FaceCamera = true
-	return beam
-end
-
-local linesToChests = {}
-local linesToOther = {}
-
-local function updateLines(targets, linesTable, color)
-	-- Создаем или обновляем линии
-	for i, target in ipairs(targets) do
-		if not linesTable[i] then
-			local attachmentPlayer = createAttachment(humanoidRootPart)
-			local attachmentTarget = createAttachment(target)
-			local beam = createBeam(attachmentPlayer, attachmentTarget, color)
-			linesTable[i] = {
-				beam = beam,
-				attachmentPlayer = attachmentPlayer,
-				attachmentTarget = attachmentTarget
-			}
-		end
-		-- Обновляем позиции
-		local lineData = linesTable[i]
-		lineData.attachmentPlayer.WorldPosition = humanoidRootPart.Position
-		lineData.attachmentTarget.WorldPosition = target.Position
-		lineData.beam.Enabled = true
-	end
-
-	-- Удаляем лишние линии
-	while #linesTable > #targets do
-		local lineData = table.remove(linesTable)
-		lineData.beam:Destroy()
-		lineData.attachmentTarget:Destroy()
-		lineData.attachmentPlayer:Destroy()
-	end
-end
-
 local function toggleKilling()
 	isKilling = not isKilling
 	if isKilling then
@@ -189,11 +131,79 @@ local function updateHighlights()
 	end
 end
 
+local lineFolder = Instance.new("Folder", workspace)
+lineFolder.Name = "PlayerToNPCLines"
+
+local function createLine(npc)
+	local attachment0 = Instance.new("Attachment")
+	local attachment1 = Instance.new("Attachment")
+
+	local beam = Instance.new("Beam")
+	beam.Attachment0 = attachment0
+	beam.Attachment1 = attachment1
+	beam.Color = ColorSequence.new(Color3.new(1, 0, 0))
+	beam.Width0 = 0.2
+	beam.Width1 = 0.2
+	beam.Transparency = NumberSequence.new(0.5)
+	beam.Parent = lineFolder
+
+	return {
+		Beam = beam,
+		Attachment0 = attachment0,
+		Attachment1 = attachment1
+	}
+end
+
+local npcLines = {}
+
+local function updateLines()
+	local playerCharacter = LocalPlayer.Character
+	if not playerCharacter then return end
+	local hrp = playerCharacter:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+	local playerPos = hrp.Position
+
+	for npc, highlight in pairs(npcHighlights) do
+		if highlight.Enabled then
+			local lineData = npcLines[npc]
+			if not lineData then
+				lineData = createLine(npc)
+				npcLines[npc] = lineData
+			end
+			-- Обновляем позиции
+			lineData.Attachment0.WorldPosition = playerPos
+			local npcHrp = npc:FindFirstChild("HumanoidRootPart")
+			if npcHrp then
+				lineData.Attachment1.WorldPosition = npcHrp.Position
+			end
+		else
+			-- Удаляем линию, если подсветка выключена
+			if npcLines[npc] then
+				npcLines[npc].Beam:Destroy()
+				npcLines[npc].Attachment0:Destroy()
+				npcLines[npc].Attachment1:Destroy()
+				npcLines[npc] = nil
+			end
+		end
+	end
+
+	-- Удаляем линии для NPC, которых больше нет или не подсвечены
+	for npc, lineData in pairs(npcLines) do
+		if not npcHighlights[npc] or not npcHighlights[npc].Enabled then
+			lineData.Beam:Destroy()
+			lineData.Attachment0:Destroy()
+			lineData.Attachment1:Destroy()
+			npcLines[npc] = nil
+		end
+	end
+end
+
 -- Постоянное обновление подсветки
 coroutine.wrap(function()
 	while true do
 		wait(1)
 		updateHighlights()
+		updateLines()
 	end
 end)()
 
@@ -291,10 +301,4 @@ Frame.InputChanged:Connect(function(input)
 		local delta = input.Position - dragStart
 		Frame.Position = startPos + UDim2.new(0, delta.X, 0, delta.Y)
 	end
-end)
-
-runService.RenderStepped:Connect(function()
-	local npc = findHumanoids({"npc"})
-
-	updateLines(npc, linesToChests, Color3.new(1, 0, 0)) -- фиолетовый для сундуков
 end)
