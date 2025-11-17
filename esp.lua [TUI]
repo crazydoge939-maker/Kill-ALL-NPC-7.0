@@ -1,3 +1,4 @@
+
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
@@ -341,5 +342,31 @@ runService.Heartbeat:Connect(function()
 		if not npcHighlights[npc] or not npcHighlights[npc].Enabled then
 			removeLine(npc)
 		end
+	end
+end)
+
+-- Перетаскивание GUI
+local dragging = false
+local dragStart
+local startPos
+
+Frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = Frame.Position
+	end
+end)
+
+Frame.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = false
+	end
+end)
+
+Frame.InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - dragStart
+		Frame.Position = startPos + UDim2.new(0, delta.X, 0, delta.Y)
 	end
 end)
