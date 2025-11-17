@@ -1,3 +1,4 @@
+
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
@@ -212,19 +213,12 @@ local function updateLines()
     end
 end
 
--- Запускаем постоянное обновление линий
-coroutine.wrap(function()
-	while true do
-		wait(0.03) -- примерно 30 кадров в секунду
-		updateLines()
-	end
-end)()
-
 -- Постоянное обновление подсветки
 coroutine.wrap(function()
 	while true do
 		wait(1)
 		updateHighlights()
+		updateLines()
 	end
 end)()
 
