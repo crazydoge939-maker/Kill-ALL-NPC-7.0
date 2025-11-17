@@ -10,13 +10,13 @@ local LocalPlayer = Players.LocalPlayer
 -- Список NPC, которых не нужно убивать
 local doNotKillList = {
 	["DJ"] = true,
+	["Bounty Hunter"] = true,
 	["Mysterious Seller"] = true
 }
 
 -- Создаем GUI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "KillerGUI"
-ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game.CoreGui
 
 local Frame = Instance.new("Frame")
