@@ -1,3 +1,4 @@
+
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
@@ -201,7 +202,7 @@ local function updateLines()
 			if isNpcAlive(npc) then
 				local lineData = npcLines[npc]
 				if not lineData then
-					lineData = createLine(npc) -- передаем npc
+					lineData = createLine(npc)
 					npcLines[npc] = lineData
 				end
 				lineData.TargetPos0 = playerPos
