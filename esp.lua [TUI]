@@ -11,7 +11,8 @@ local LocalPlayer = Players.LocalPlayer
 local doNotKillList = {
 	["DJ"] = true,
 	["Bounty Hunter"] = true,
-	["Mysterious Seller"] = true
+	["Mysterious Seller"] = true,
+	["gingerman"] = true,
 }
 
 -- Создаем GUI
