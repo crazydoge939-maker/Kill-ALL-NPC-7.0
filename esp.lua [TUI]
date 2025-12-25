@@ -10,20 +10,18 @@ local LocalPlayer = Players.LocalPlayer
 local doNotKillList = {
 	["DJ"] = true,
 	["Bounty Hunter"] = true,
-	["Mysterious Seller"] = true,
-	["Fruit Dealer"] = true,
-	["gingerman"] = true,
-	["Elf Traveler"] = true,
+	["Mysterious Seller"] = true
 }
 
-local blueHighlightNPCs = {
-    ["Elf Traveler"] = true,
-    ["Demon"] = true,
+local specialNPCs = {
+	["Elf Traveler"] = true,
+	["Demon"] = true,
 }
 
 -- Создаем GUI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "KillerGUI"
+ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game.CoreGui
 
 local Frame = Instance.new("Frame")
@@ -126,67 +124,75 @@ end
 local npcHighlights = {} -- таблица для хранения подсветки всех NPC
 
 local function updateHighlights()
-    local npcs = findHumanoids()
-    for _, npc in pairs(npcs) do
-        if npc then
-            local highlight = npcHighlights[npc]
-            if not highlight then
-                highlight = Instance.new("Highlight")
-                highlight.Name = "Highlight"
-                highlight.Adornee = npc
-                -- Устанавливаем цвет подсветки в зависимости от списка
-                if doNotKillList[npc.Name] then
-                    highlight.FillColor = Color3.fromRGB(0, 85, 0) -- зеленый
-                    highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
-                elseif blueHighlightNPCs[npc.Name] then
-                    highlight.FillColor = Color3.fromRGB(0, 0, 255) -- синий
-                    highlight.OutlineColor = Color3.fromRGB(0, 0, 255)
-                else
-                    highlight.FillColor = Color3.fromRGB(85, 0, 0) -- красный
-                    highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
-                end
-                highlight.Parent = npc
-                npcHighlights[npc] = highlight
-            end
-            -- Обновляем статус подсветки
-            highlight.Enabled = true
-        end
-    end
+	local npcs = findHumanoids()
+	for _, npc in pairs(npcs) do
+		if npc then
+			local highlight = npcHighlights[npc]
+			if not highlight then
+				highlight = Instance.new("Highlight")
+				highlight.Name = "Highlight"
+				highlight.Adornee = npc
+				-- выбираем цвет подсветки
+				if doNotKillList[npc.Name] then
+					highlight.FillColor = Color3.fromRGB(0, 85, 0) -- зеленый
+					highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
+				elseif specialNPCs[npc.Name] then
+					highlight.FillColor = Color3.fromRGB(160, 32, 240) -- фиолетовый
+					highlight.OutlineColor = Color3.fromRGB(160, 32, 240)
+				else
+					highlight.FillColor = Color3.fromRGB(85, 0, 0) -- красный
+					highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+				end
+				highlight.Parent = npc
+				npcHighlights[npc] = highlight
+			end
+			-- обновляем статус подсветки
+			if doNotKillList[npc.Name] or specialNPCs[npc.Name] then
+				npcHighlights[npc].Enabled = true
+			else
+				npcHighlights[npc].Enabled = true
+			end
+		end
+	end
 end
 
 local lineFolder = Instance.new("Folder", workspace)
 lineFolder.Name = "PlayerToNPCLines"
 
 local function createLine(npc)
-    local attachment0 = Instance.new("Attachment")
-    local attachment1 = Instance.new("Attachment")
+	local attachment0 = Instance.new("Attachment")
+	local attachment1 = Instance.new("Attachment")
 
-    attachment0.Parent = workspace
-    attachment1.Parent = workspace
+	attachment0.Parent = workspace
+	attachment1.Parent = workspace
 
-    local beam = Instance.new("Beam")
-    beam.Attachment0 = attachment0
-    beam.Attachment1 = attachment1
-    -- Устанавливаем цвет линии в зависимости от NPC
-    if npc and npc.Name and doNotKillList[npc.Name] then
-        beam.Color = ColorSequence.new(Color3.fromRGB(0, 255, 0))
-    elseif blueHighlightNPCs[npc and npc.Name] then
-        beam.Color = ColorSequence.new(Color3.fromRGB(0, 0, 255))
-    else
-        beam.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
-    end
-    beam.Width0 = 0.2
-    beam.Width1 = 0.2
-    beam.Transparency = NumberSequence.new(0.5)
-    beam.Parent = lineFolder
+	local beam = Instance.new("Beam")
+	beam.Attachment0 = attachment0
+	beam.Attachment1 = attachment1
+	-- устанавливаем цвет линии в зависимости от NPC
+	if npc and npc.Name then
+		if doNotKillList[npc.Name] then
+			beam.Color = ColorSequence.new(Color3.fromRGB(0, 255, 0)) -- зеленый
+		elseif specialNPCs[npc.Name] then
+			beam.Color = ColorSequence.new(Color3.fromRGB(160, 32, 240)) -- фиолетовый
+		else
+			beam.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0)) -- красный
+		end
+	else
+		beam.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
+	end
+	beam.Width0 = 0.2
+	beam.Width1 = 0.2
+	beam.Transparency = NumberSequence.new(0.5)
+	beam.Parent = lineFolder
 
-    return {
-        Beam = beam,
-        Attachment0 = attachment0,
-        Attachment1 = attachment1,
-        TargetPos0 = Vector3.new(),
-        TargetPos1 = Vector3.new()
-    }
+	return {
+		Beam = beam,
+		Attachment0 = attachment0,
+		Attachment1 = attachment1,
+		TargetPos0 = Vector3.new(),
+		TargetPos1 = Vector3.new()
+	}
 end
 
 local function isNpcAlive(npc)
