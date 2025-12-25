@@ -13,6 +13,7 @@ local doNotKillList = {
 	["Bounty Hunter"] = true,
 	["Mysterious Seller"] = true,
 	["gingerman"] = true,
+	["Elf Traveler"] = true,
 }
 
 -- Создаем GUI
