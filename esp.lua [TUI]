@@ -1,3 +1,4 @@
+
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
@@ -17,6 +18,14 @@ local specialNPCs = {
 	["Elf Traveler"] = true,
 	["Demon"] = true,
 	["Halloween Hell:GRIM"] = true,
+	["Troll-096"] = true,
+	["Trollge King"] = true,
+	["Corruption"] = true,
+	["Space Eater"] = true,
+	["Red Nemesis"] = true,
+	["Paladin"] = true,
+	["Ophaenem"] = true,
+	["Santa NK-1"] = true,
 }
 
 -- Создаем GUI
@@ -138,8 +147,8 @@ local function updateHighlights()
 					highlight.FillColor = Color3.fromRGB(0, 85, 0) -- зеленый
 					highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
 				elseif specialNPCs[npc.Name] then
-					highlight.FillColor = Color3.fromRGB(255, 170, 0) -- фиолетовый
-					highlight.OutlineColor = Color3.fromRGB(255, 85, 0)
+					highlight.FillColor = Color3.fromRGB(255, 255, 0) -- желтый
+					highlight.OutlineColor = Color3.fromRGB(255, 170, 0)
 				else
 					highlight.FillColor = Color3.fromRGB(85, 0, 0) -- красный
 					highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
@@ -175,7 +184,7 @@ local function createLine(npc)
 		if doNotKillList[npc.Name] then
 			beam.Color = ColorSequence.new(Color3.fromRGB(0, 255, 0)) -- зеленый
 		elseif specialNPCs[npc.Name] then
-			beam.Color = ColorSequence.new(Color3.fromRGB(255, 170, 0)) -- фиолетовый
+			beam.Color = ColorSequence.new(Color3.fromRGB(255, 255, 0)) -- желтый
 		else
 			beam.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0)) -- красный
 		end
