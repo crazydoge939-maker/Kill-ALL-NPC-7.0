@@ -1,4 +1,3 @@
-
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
@@ -19,6 +18,10 @@ local specialNPCs = {
 	["Elf Traveler"] = true,
 	["Demon"] = true,
 	["Halloween Hell:GRIM"] = true,
+	["DUMMYTROLLGEOVERPAIN"] = true,
+
+
+
 	["Troll-096"] = true,
 	["Trollge King"] = true,
 	["Corruption"] = true,
@@ -76,7 +79,7 @@ buttonCorner.Parent = ToggleButton
 ToggleButton.Parent = Frame
 
 local KillCountLabel = Instance.new("TextLabel")
-KillCountLabel.Size = UDim2.new(1, -40, 0, 120)
+KillCountLabel.Size = UDim2.new(1, -40, 0, 200)
 KillCountLabel.Position = UDim2.new(0, 20, 0, 95)
 KillCountLabel.BackgroundTransparency = 1
 KillCountLabel.Text = "Жертвы:\n"
