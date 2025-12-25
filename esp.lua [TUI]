@@ -12,6 +12,7 @@ local doNotKillList = {
 	["DJ"] = true,
 	["Bounty Hunter"] = true,
 	["Mysterious Seller"] = true,
+	["Fruit Dealer"] = true,
 	["gingerman"] = true,
 	["Elf Traveler"] = true,
 }
