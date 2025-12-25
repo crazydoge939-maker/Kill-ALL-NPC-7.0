@@ -1,3 +1,4 @@
+
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
@@ -35,8 +36,8 @@ local specialNPCs = {
 	["Santa NK-1"] = true,
 }
 
-local npcTextColors = {} -- таблица для хранения времени появления и цветов
-local colorTransitionDuration = 10 -- время в секундах для смены цвета
+local npcNameTimers = {}
+local npcTextLabels = {}
 
 -- Создаем GUI
 local ScreenGui = Instance.new("ScreenGui")
@@ -303,66 +304,66 @@ end)()
 local killedHumanoidsCount = {}
 
 local function updateKillCount()
+	-- Обновляем счетчики
 	killedHumanoidsCount = {}
 	for _, npc in pairs(findHumanoids()) do
 		local name = npc.Name
+		if not npcNameTimers[name] then
+			npcNameTimers[name] = tick()
+		end
 		if killedHumanoidsCount[name] then
 			killedHumanoidsCount[name] = killedHumanoidsCount[name] + 1
 		else
+			npcNameTimers[name] = tick()
 			killedHumanoidsCount[name] = 1
 		end
 	end
-	local displayText = "Жертвы:\n"
-	for name, count in pairs(killedHumanoidsCount) do
-		displayText = displayText .. name
-		if count > 1 then
-			displayText = displayText .. " x" .. count
-		end
-		displayText = displayText .. "\n"
-	end
-	KillCountLabel.Text = displayText
 
-	-- Обновляем таблицу для новых NPC
+	-- Обновляем отображение
+	for name, count in pairs(killedHumanoidsCount) do
+		local label = npcTextLabels[name]
+		if not label then
+			-- создаем новую строку
+			label = Instance.new("TextLabel")
+			label.Size = UDim2.new(1, -10, 0, 20)
+			label.BackgroundTransparency = 1
+			label.TextXAlignment = Enum.TextXAlignment.Left
+			label.TextSize = 20
+			label.Font = Enum.Font.Gotham
+			label.Parent = KillCountLabel -- или другой контейнер
+			npcTextLabels[name] = label
+		end
+		-- Обновляем текст
+		label.Text = name
+		if count > 1 then
+			label.Text = label.Text .. " x" .. count
+		end
+		-- Запоминаем время
+		if not npcNameTimers[name] then
+			npcNameTimers[name] = tick()
+		end
+		-- Устанавливаем цвет в зеленый при появлении
+		label.TextColor3 = Color3.fromRGB(0, 255, 0)
+	end
+
+	-- Обновляем цвет для существующих линий
 	local currentTime = tick()
-	for _, line in ipairs(string.split(displayText, "\n")) do
-		local npcName = line:match("([^%s]+)$") -- получаем имя NPC в конце строки
-		if npcName and not npcTextColors[npcName] then
-			npcTextColors[npcName] = {
-				StartTime = currentTime,
-				Color = Color3.fromRGB(0, 255, 0) -- зеленый для новых
-			}
+	for name, label in pairs(npcTextLabels) do
+		local spawnTime = npcNameTimers[name] or 0
+		local elapsed = currentTime - spawnTime
+		if elapsed >= 10 then
+			-- через 10 секунд - плавно меняем на белый
+			-- Можно реализовать плавное изменение цвета, например, через lerp
+			local t = math.min((elapsed - 10) / 2, 1) -- за 2 секунды до белого
+			label.TextColor3 = Color3.new(0, 1, 0):Lerp(Color3.new(1, 1, 1), t)
 		end
 	end
 end
 
 coroutine.wrap(function()
 	while true do
-		wait(0.1)
-		local text = KillCountLabel.Text
-		local lines = string.split(text, "\n")
-		local currentTime = tick()
-		for i, line in ipairs(lines) do
-			local name = line:match("([^%s]+)$")
-			if name and npcTextColors[name] then
-				local info = npcTextColors[name]
-				local elapsed = currentTime - info.StartTime
-				if elapsed >= colorTransitionDuration then
-					-- меняем цвет на белый
-					local r, g, b = Color3.toRGB(info.Color)
-					-- плавное изменение к белому
-					local progress = math.min((elapsed - colorTransitionDuration) / 2, 1)
-					local newColor = Color3.new(
-						r + (1 - r) * progress,
-						g + (1 - g) * progress,
-						b + (1 - b) * progress
-					)
-					-- тут нужно обновить цвет текста для этой строки
-					-- но TextLabel не позволяет менять цвет отдельных строк
-					-- Можно заменить весь текст с цветом, например, через RichText
-					-- Для этого нужно включить RichText и форматировать текст
-				end
-			end
-		end
+		wait(0.5)
+		updateKillCount()
 	end
 end)()
 
