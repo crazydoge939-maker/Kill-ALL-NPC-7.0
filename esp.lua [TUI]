@@ -1,3 +1,4 @@
+
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
@@ -21,6 +22,9 @@ local specialNPCs = {
 	["Alien Protector"] = true,
 	["King Small Trollge"] = true,
 	["DUMMYTROLLGEOVERPAIN"] = true,
+
+
+
 	["Troll-096"] = true,
 	["Trollge King"] = true,
 	["Corruption"] = true,
@@ -31,6 +35,8 @@ local specialNPCs = {
 	["Ophaenem"] = true,
 	["Santa NK-1"] = true,
 }
+
+local npcAppearanceTimes = {} -- {["NPCName"] = time}
 
 -- Создаем GUI
 local ScreenGui = Instance.new("ScreenGui")
@@ -78,7 +84,7 @@ buttonCorner.Parent = ToggleButton
 ToggleButton.Parent = Frame
 
 local KillCountLabel = Instance.new("TextLabel")
-KillCountLabel.Size = UDim2.new(1, -40, 0, 430)
+KillCountLabel.Size = UDim2.new(1, -40, 0, 430) -- Кол-во строк
 KillCountLabel.Position = UDim2.new(0, 20, 0, 100)
 KillCountLabel.BackgroundTransparency = 1
 KillCountLabel.Text = "Жертвы:\n"
@@ -159,9 +165,6 @@ local function updateHighlights()
 				end
 				highlight.Parent = npc
 				npcHighlights[npc] = highlight
-
-				-- Запоминаем время появления
-				npcAppearanceTimes[npc] = tick()
 			end
 			-- обновляем статус подсветки
 			if doNotKillList[npc.Name] or specialNPCs[npc.Name] then
@@ -220,7 +223,6 @@ end
 
 local npcLines = {}
 local smoothingFactor = 1
-local npcAppearanceTimes = {} -- таблица для времени появления NPC
 
 local function updateLines()
 	local playerCharacter = LocalPlayer.Character
@@ -234,7 +236,7 @@ local function updateLines()
 			if isNpcAlive(npc) then
 				local lineData = npcLines[npc]
 				if not lineData then
-					lineData = createLine()
+					lineData = createLine(npc)
 					npcLines[npc] = lineData
 				end
 				lineData.TargetPos0 = playerPos
@@ -290,6 +292,8 @@ local function removeLine(npc)
 	end
 end
 
+KillCountLabel.RichText = true
+
 coroutine.wrap(function()
 	while true do
 		wait(1)
@@ -302,8 +306,12 @@ local killedHumanoidsCount = {}
 
 local function updateKillCount()
 	killedHumanoidsCount = {}
+	local currentTime = tick()
 	for _, npc in pairs(findHumanoids()) do
 		local name = npc.Name
+		if not npcAppearanceTimes[name] then
+			npcAppearanceTimes[name] = currentTime -- запоминаем время появления
+		end
 		if killedHumanoidsCount[name] then
 			killedHumanoidsCount[name] = killedHumanoidsCount[name] + 1
 		else
@@ -312,13 +320,56 @@ local function updateKillCount()
 	end
 	local displayText = "Жертвы:\n"
 	for name, count in pairs(killedHumanoidsCount) do
-		displayText = displayText .. name
+		local elapsed = currentTime - (npcAppearanceTimes[name] or currentTime)
+		local progress = math.clamp(elapsed / 10, 0, 1)
+		local startColor = {R=0, G=255, B=0}
+		local endColor = {R=255, G=255, B=255}
+		local currentColor = {
+			R = math.floor(startColor.R + (endColor.R - startColor.R) * progress),
+			G = math.floor(startColor.G + (endColor.G - startColor.G) * progress),
+			B = math.floor(startColor.B + (endColor.B - startColor.B) * progress),
+		}
+		local colorTag = string.format('<font color="rgb(%d,%d,%d)">', currentColor.R, currentColor.G, currentColor.B)
+		local resetTag = "</font>"
+
+		local lineStr = name
 		if count > 1 then
-			displayText = displayText .. " x" .. count
+			lineStr = lineStr .. " x" .. count
 		end
-		displayText = displayText .. "\n"
+		displayText = displayText .. colorTag .. lineStr .. resetTag .. "\n"
 	end
 	KillCountLabel.Text = displayText
+end
+
+local function updateTextColors()
+	local currentTime = tick()
+
+	for name, timeAppeared in pairs(npcAppearanceTimes) do
+		local elapsed = currentTime - timeAppeared
+		local progress = math.clamp(elapsed / 10, 0, 1) -- 10 секунд на смену цвета
+		local startColor = Color3.fromRGB(0, 255, 0) -- зеленый
+		local endColor = Color3.fromRGB(255, 255, 255) -- белый
+		local currentColor = Color3.new(
+			startColor.R + (endColor.R - startColor.R) * progress,
+			startColor.G + (endColor.G - startColor.G) * progress,
+			startColor.B + (endColor.B - startColor.B) * progress
+		)
+
+		-- Обновляем цвет текста для строки с этим NPC
+		local textLines = string.split(KillCountLabel.Text, "\n")
+
+		for i, line in ipairs(textLines) do
+			if line:sub(1, #name) == name then
+				-- Обновляем цвет этой строки
+				-- Для этого понадобится использовать TextColorSequence или менять цвет всей строки
+				-- Но TextLabel в Roblox не поддерживает изменение цвета отдельных строк.
+				-- Поэтому проще перерисовать весь текст, меняя цвет, или использовать отдельные TextLabels.
+				-- Для простоты сделаю так:
+				-- Перезадаем весь текст с цветом, выделяя нужные строки цветом (сложно, проще так)
+				-- или создадим отдельный TextLabel для каждой строки (рекомендуется).
+			end
+		end
+	end
 end
 
 coroutine.wrap(function()
@@ -362,21 +413,6 @@ end
 
 -- Основной цикл
 runService.Heartbeat:Connect(function()
-	-- Обновляем цвета текста для новых NPC (плавно меняется с зеленого на белый через 10 сек)
-	for npc, _ in pairs(npcHighlights) do
-		if npc then
-			local timeSinceAppear = tick() - (npcAppearanceTimes[npc] or 0)
-			if timeSinceAppear < 10 then
-				KillCountLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-			else
-				local currentColor = KillCountLabel.TextColor3
-				local targetColor = Color3.fromRGB(255, 255, 255)
-				local lerpAlpha = math.min((tick() - (npcAppearanceTimes[npc] or 0) - 10) / 2, 1) -- плавное изменение за 2 секунды
-				KillCountLabel.TextColor3 = currentColor:Lerp(targetColor, lerpAlpha)
-			end
-		end
-	end
-
 	if isKilling then
 		local currentTime = tick()
 		local elapsed = currentTime - lastKillTime
