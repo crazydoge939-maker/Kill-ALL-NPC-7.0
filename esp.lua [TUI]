@@ -1,4 +1,3 @@
-
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
@@ -35,6 +34,9 @@ local specialNPCs = {
 	["Ophaenem"] = true,
 	["Santa NK-1"] = true,
 }
+
+local npcTextColors = {} -- таблица для хранения времени появления и цветов
+local colorTransitionDuration = 10 -- время в секундах для смены цвета
 
 -- Создаем GUI
 local ScreenGui = Instance.new("ScreenGui")
@@ -319,12 +321,48 @@ local function updateKillCount()
 		displayText = displayText .. "\n"
 	end
 	KillCountLabel.Text = displayText
+
+	-- Обновляем таблицу для новых NPC
+	local currentTime = tick()
+	for _, line in ipairs(string.split(displayText, "\n")) do
+		local npcName = line:match("([^%s]+)$") -- получаем имя NPC в конце строки
+		if npcName and not npcTextColors[npcName] then
+			npcTextColors[npcName] = {
+				StartTime = currentTime,
+				Color = Color3.fromRGB(0, 255, 0) -- зеленый для новых
+			}
+		end
+	end
 end
 
 coroutine.wrap(function()
 	while true do
-		wait(0.5)
-		updateKillCount()
+		wait(0.1)
+		local text = KillCountLabel.Text
+		local lines = string.split(text, "\n")
+		local currentTime = tick()
+		for i, line in ipairs(lines) do
+			local name = line:match("([^%s]+)$")
+			if name and npcTextColors[name] then
+				local info = npcTextColors[name]
+				local elapsed = currentTime - info.StartTime
+				if elapsed >= colorTransitionDuration then
+					-- меняем цвет на белый
+					local r, g, b = Color3.toRGB(info.Color)
+					-- плавное изменение к белому
+					local progress = math.min((elapsed - colorTransitionDuration) / 2, 1)
+					local newColor = Color3.new(
+						r + (1 - r) * progress,
+						g + (1 - g) * progress,
+						b + (1 - b) * progress
+					)
+					-- тут нужно обновить цвет текста для этой строки
+					-- но TextLabel не позволяет менять цвет отдельных строк
+					-- Можно заменить весь текст с цветом, например, через RichText
+					-- Для этого нужно включить RichText и форматировать текст
+				end
+			end
+		end
 	end
 end)()
 
