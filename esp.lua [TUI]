@@ -20,6 +20,8 @@ local specialNPCs = {
 	["Demon"] = true,
 	["Halloween Hell:GRIM"] = true,
 	["Alien Protector"] = true,
+	["King Small Trollge"] = true,
+	["DUMMYTROLLGEOVERPAIN"] = true,
 
 
 
