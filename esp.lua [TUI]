@@ -1,3 +1,4 @@
+
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
@@ -21,6 +22,7 @@ local specialNPCs = {
 	["Troll-096"] = true,
 	["Trollge King"] = true,
 	["Corruption"] = true,
+	["The Roofs"] = true,
 	["Space Eater"] = true,
 	["Red Nemesis"] = true,
 	["Paladin"] = true,
