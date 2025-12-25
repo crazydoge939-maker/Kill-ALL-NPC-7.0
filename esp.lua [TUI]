@@ -63,7 +63,7 @@ Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Parent = Frame
 
 local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 120, 0, 35)
+ToggleButton.Size = UDim2.new(0, 120, 0, 40)
 ToggleButton.Position = UDim2.new(0, 20, 0, 50)
 ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
 ToggleButton.Font = Enum.Font.GothamBold
@@ -77,7 +77,7 @@ ToggleButton.Parent = Frame
 
 local KillCountLabel = Instance.new("TextLabel")
 KillCountLabel.Size = UDim2.new(1, -40, 0, 400) -- Кол-во строк
-KillCountLabel.Position = UDim2.new(0, 20, 0, 95)
+KillCountLabel.Position = UDim2.new(0, 20, 0, 100)
 KillCountLabel.BackgroundTransparency = 1
 KillCountLabel.Text = "Жертвы:\n"
 KillCountLabel.TextWrapped = true
@@ -91,7 +91,7 @@ KillCountLabel.Parent = Frame
 -- Линия прогресса расположена ниже логов
 local ProgressBackground = Instance.new("Frame")
 ProgressBackground.Size = UDim2.new(1, -40, 0, 10)
-ProgressBackground.Position = UDim2.new(0, 20, 0, 430)
+ProgressBackground.Position = UDim2.new(0, 20, 0, 20)
 ProgressBackground.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 ProgressBackground.BorderSizePixel = 0
 local progressCorner = Instance.new("UICorner")
