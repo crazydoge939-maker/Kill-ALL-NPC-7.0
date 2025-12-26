@@ -21,6 +21,7 @@ local specialNPCs = {
 	["Alien Protector"] = true,
 	["King Small Trollge"] = true,
 	["DUMMYTROLLGEOVERPAIN"] = true,
+	["Mimic"] = true,
 
 
 
