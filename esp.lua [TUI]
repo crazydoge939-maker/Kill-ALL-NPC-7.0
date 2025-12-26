@@ -110,7 +110,7 @@ toggleModeButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
 toggleModeButton.Font = Enum.Font.GothamBold
 toggleModeButton.TextSize = 16
 toggleModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleModeButton.Text = "Выкл подсветку"
+toggleModeButton.Text = "[ON] Подсветку"
 local buttonCorner = Instance.new("UICorner")
 buttonCorner.CornerRadius = UDim.new(0, 8)
 buttonCorner.Parent = toggleModeButton
@@ -396,7 +396,7 @@ end)()
 local function toggleMode()
 	isEnabled = not isEnabled
 	if isEnabled then
-		toggleModeButton.Text = "Выкл подсветку"
+		toggleModeButton.Text = "[OFF] Подсветку"
 		toggleModeButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
 		-- Включаем подсветку и GUI
 		for _, highlight in pairs(npcHighlights) do
@@ -407,7 +407,7 @@ local function toggleMode()
 			lineData.Beam.Transparency = NumberSequence.new(0)
 		end
 	else
-		toggleModeButton.Text = "Включить подсветку"
+		toggleModeButton.Text = "[ON] Подсветку"
 		toggleModeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 		-- Выключаем подсветку и делаем линии прозрачными
 		for _, highlight in pairs(npcHighlights) do
