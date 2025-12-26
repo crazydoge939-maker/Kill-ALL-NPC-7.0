@@ -34,7 +34,7 @@ local specialNPCs = {
 	["Red Nemesis"] = true,
 	["Paladin"] = true,
 	["Ophaenem"] = true,
-	["Santa NK-1"] = true,
+	["Santa-NK1"] = true,
 }
 
 local npcAppearanceTimes = {} -- {["NPCName"] = time}
