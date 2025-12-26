@@ -39,12 +39,17 @@ local specialNPCs = {
 
 local npcAppearanceTimes = {} -- {["NPCName"] = time}
 local npcDisplayStates = {} -- {["NPCName"] = {type="green"|"yellow", time=timestamp}}
+local npcNameGuis = {} -- таблица для хранения GUI над NPC
+
+local isEnabled = true -- состояние режима (включено/выключено)
 
 -- Создаем GUI
+local player = game.Players.LocalPlayer
+local PlayerGui = player:WaitForChild("PlayerGui")
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "KillerGUI"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = game.CoreGui
+ScreenGui.Parent = PlayerGui
 
 local Frame = Instance.new("Frame")
 Frame.Size = UDim2.new(0, 300, 0, 450)
@@ -98,6 +103,19 @@ KillCountLabel.TextSize = 20
 KillCountLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 KillCountLabel.Parent = Frame
 
+local toggleModeButton = Instance.new("TextButton")
+toggleModeButton.Size = UDim2.new(0, 120, 0, 40)
+toggleModeButton.Position = UDim2.new(0, 150, 0, 50)
+toggleModeButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+toggleModeButton.Font = Enum.Font.GothamBold
+toggleModeButton.TextSize = 16
+toggleModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleModeButton.Text = "Выкл подсветку"
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 8)
+buttonCorner.Parent = toggleModeButton
+toggleModeButton.Parent = Frame
+
 -- Линия прогресса расположена ниже логов
 local ProgressBackground = Instance.new("Frame")
 ProgressBackground.Size = UDim2.new(1, -40, 0, 10)
@@ -116,6 +134,35 @@ ProgressBar.BorderSizePixel = 0
 local progressInnerCorner = Instance.new("UICorner")
 progressInnerCorner.CornerRadius = UDim.new(0, 5)
 ProgressBar.Parent = ProgressBackground
+
+local function createNameGui(npc)
+	local billboardGui = Instance.new("BillboardGui")
+	billboardGui.Name = "NPCNameGui"
+	billboardGui.Adornee = npc
+	billboardGui.Size = UDim2.new(0, 75, 0, 30)
+	billboardGui.StudsOffset = Vector3.new(0, 2, 0)
+	billboardGui.AlwaysOnTop = true
+
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Size = UDim2.new(1, 0, 1, 0)
+	textLabel.BackgroundTransparency = 1
+	textLabel.Text = npc.Name
+	textLabel.TextColor3 = Color3.new(1, 1, 1)
+	textLabel.TextStrokeTransparency = 0
+	textLabel.TextScaled = true
+	textLabel.Font = Enum.Font.GothamBold
+	textLabel.Parent = billboardGui
+
+	billboardGui.Parent = npc
+	npcNameGuis[npc] = billboardGui
+
+	-- Начальная прозрачность в зависимости от режима
+	if not isEnabled then
+		billboardGui.Enabled = false
+	else
+		billboardGui.Enabled = true
+	end
+end
 
 local function toggleKilling()
 	isKilling = not isKilling
@@ -154,25 +201,37 @@ local function updateHighlights()
 				highlight = Instance.new("Highlight")
 				highlight.Name = "Highlight"
 				highlight.Adornee = npc
-				-- выбираем цвет подсветки
+				-- установка цвета
 				if doNotKillList[npc.Name] then
-					highlight.FillColor = Color3.fromRGB(0, 85, 0) -- зеленый
+					highlight.FillColor = Color3.fromRGB(0, 85, 0)
 					highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
 				elseif specialNPCs[npc.Name] then
-					highlight.FillColor = Color3.fromRGB(255, 85, 0) -- желтый
+					highlight.FillColor = Color3.fromRGB(255, 85, 0)
 					highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
 				else
-					highlight.FillColor = Color3.fromRGB(85, 0, 0) -- красный
+					highlight.FillColor = Color3.fromRGB(85, 0, 0)
 					highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
 				end
 				highlight.Parent = npc
 				npcHighlights[npc] = highlight
+
+				-- при создании, если режим выключен, делаем подсветку прозрачной
+				if not isEnabled then
+					highlight.FillTransparency = 1
+					highlight.OutlineTransparency = 1
+				else
+					highlight.FillTransparency = 0
+					highlight.OutlineTransparency = 0
+				end
 			end
 			-- обновляем статус подсветки
 			if doNotKillList[npc.Name] or specialNPCs[npc.Name] then
 				npcHighlights[npc].Enabled = true
 			else
 				npcHighlights[npc].Enabled = true
+			end
+			if not npcNameGuis[npc] then
+				createNameGui(npc)
 			end
 		end
 	end
@@ -191,30 +250,41 @@ local function createLine(npc)
 	local beam = Instance.new("Beam")
 	beam.Attachment0 = attachment0
 	beam.Attachment1 = attachment1
-	-- устанавливаем цвет линии в зависимости от NPC
-	if npc and npc.Name then
-		if doNotKillList[npc.Name] then
-			beam.Color = ColorSequence.new(Color3.fromRGB(0, 255, 0)) -- зеленый
-		elseif specialNPCs[npc.Name] then
-			beam.Color = ColorSequence.new(Color3.fromRGB(255, 255, 0)) -- желтый
-		else
-			beam.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0)) -- красный
-		end
-	else
-		beam.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
-	end
-	beam.Width0 = 0.2
-	beam.Width1 = 0.2
-	beam.Transparency = NumberSequence.new(0.5)
-	beam.Parent = lineFolder
 
-	return {
+	local lineData = {
 		Beam = beam,
 		Attachment0 = attachment0,
 		Attachment1 = attachment1,
 		TargetPos0 = Vector3.new(),
 		TargetPos1 = Vector3.new()
 	}
+
+	-- Устанавливаем прозрачность в зависимости от режима
+	if not isEnabled then
+		lineData.Beam.Transparency = NumberSequence.new(1)
+	else
+		lineData.Beam.Transparency = NumberSequence.new(0)
+	end
+
+	-- Устанавливаем цвет линии в зависимости от NPC
+	if npc and npc.Name then
+		if doNotKillList[npc.Name] then
+			beam.Color = ColorSequence.new(Color3.fromRGB(0, 255, 0))
+		elseif specialNPCs[npc.Name] then
+			beam.Color = ColorSequence.new(Color3.fromRGB(255, 255, 0))
+		else
+			beam.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
+		end
+	else
+		beam.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
+	end
+
+	beam.Width0 = 0.2
+	beam.Width1 = 0.2
+	beam.Transparency = NumberSequence.new(0.5)
+	beam.Parent = lineFolder
+
+	return lineData
 end
 
 local function isNpcAlive(npc)
@@ -225,6 +295,16 @@ end
 
 local npcLines = {}
 local smoothingFactor = 1
+
+local function onNewNPC(npc)
+	local lineData = createLine(npc)
+	if not isEnabled then
+		lineData.Beam.Transparency = NumberSequence.new(1)
+	else
+		lineData.Beam.Transparency = NumberSequence.new(0)
+	end
+	table.insert(npcLines, lineData)
+end
 
 local function updateLines()
 	local playerCharacter = LocalPlayer.Character
@@ -238,21 +318,29 @@ local function updateLines()
 			if isNpcAlive(npc) then
 				local lineData = npcLines[npc]
 				if not lineData then
-					lineData = createLine(npc)
+					if isEnabled then
+						lineData = createLine(npc)
+					else
+						-- Если режим выключен, создаем линию, но делаем ее прозрачной
+						lineData = createLine(npc)
+						lineData.Beam.Transparency = NumberSequence.new(1)
+					end
 					npcLines[npc] = lineData
 				end
-				lineData.TargetPos0 = playerPos
-				local npcHrp = npc:FindFirstChild("HumanoidRootPart")
-				if npcHrp then
-					lineData.TargetPos1 = npcHrp.Position
-				end
-				local currentPos0 = lineData.Attachment0.WorldPosition
-				local newPos0 = currentPos0:Lerp(lineData.TargetPos0, smoothingFactor)
-				lineData.Attachment0.WorldPosition = newPos0
+				if lineData then
+					lineData.TargetPos0 = playerPos
+					local npcHrp = npc:FindFirstChild("HumanoidRootPart")
+					if npcHrp then
+						lineData.TargetPos1 = npcHrp.Position
+					end
+					local currentPos0 = lineData.Attachment0.WorldPosition
+					local newPos0 = currentPos0:Lerp(lineData.TargetPos0, smoothingFactor)
+					lineData.Attachment0.WorldPosition = newPos0
 
-				local currentPos1 = lineData.Attachment1.WorldPosition
-				local newPos1 = currentPos1:Lerp(lineData.TargetPos1, smoothingFactor)
-				lineData.Attachment1.WorldPosition = newPos1
+					local currentPos1 = lineData.Attachment1.WorldPosition
+					local newPos1 = currentPos1:Lerp(lineData.TargetPos1, smoothingFactor)
+					lineData.Attachment1.WorldPosition = newPos1
+				end
 			else
 				if npcLines[npc] then
 					npcLines[npc].Beam:Destroy()
@@ -274,6 +362,7 @@ local function updateLines()
 		end
 	end
 
+	-- Удаление линий для отключенных NPC
 	for npc, lineData in pairs(npcLines) do
 		if not npcHighlights[npc] or not npcHighlights[npc].Enabled then
 			lineData.Beam:Destroy()
@@ -303,6 +392,40 @@ coroutine.wrap(function()
 		updateLines()
 	end
 end)()
+
+local function toggleMode()
+	isEnabled = not isEnabled
+	if isEnabled then
+		toggleModeButton.Text = "Выкл подсветку"
+		toggleModeButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+		-- Включаем подсветку и GUI
+		for _, highlight in pairs(npcHighlights) do
+			highlight.FillTransparency = 0
+			highlight.OutlineTransparency = 0
+		end
+		for _, lineData in pairs(npcLines) do
+			lineData.Beam.Transparency = NumberSequence.new(0)
+		end
+	else
+		toggleModeButton.Text = "Включить подсветку"
+		toggleModeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+		-- Выключаем подсветку и делаем линии прозрачными
+		for _, highlight in pairs(npcHighlights) do
+			highlight.FillTransparency = 1
+			highlight.OutlineTransparency = 1
+		end
+		for _, lineData in pairs(npcLines) do
+			lineData.Beam.Transparency = NumberSequence.new(1)
+		end
+	end
+
+	-- Обновляем видимость GUI для всех NPC
+	for _, gui in pairs(npcNameGuis) do
+		gui.Enabled = isEnabled
+	end
+end
+
+toggleModeButton.MouseButton1Click:Connect(toggleMode)
 
 local killedHumanoidsCount = {}
 KillCountLabel.RichText = true
