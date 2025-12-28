@@ -7,7 +7,9 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 -- ==================== НАСТРОЙКИ ====================
-local MAX_CYCLES = 10 -- Сколько циклов NPC должен выжить перед смертью
+local MAX_CYCLES = 15 -- Сколько циклов NPC должен выжить перед смертью
+local REMOVE_TORSO_PART = true -- Включить удаление части тела при убийстве
+local TORSO_PART_TO_REMOVE = "Torso" -- Какую часть удалить: "Head", "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg"
 
 -- ==================== СПИСКИ NPC ====================
 -- NPC, которых не нужно убивать
@@ -124,6 +126,52 @@ toggleModeButton.Parent = Frame
 local buttonCorner2 = Instance.new("UICorner")
 buttonCorner2.CornerRadius = UDim.new(0, 8)
 buttonCorner2.Parent = toggleModeButton
+
+-- Настройки удаления частей тела
+local torsoPartSettings = Instance.new("Frame")
+torsoPartSettings.Size = UDim2.new(1, -40, 0, 80)
+torsoPartSettings.Position = UDim2.new(0, 20, 0, 380)
+torsoPartSettings.BackgroundTransparency = 1
+torsoPartSettings.Parent = Frame
+
+local torsoPartLabel = Instance.new("TextLabel")
+torsoPartLabel.Size = UDim2.new(1, 0, 0, 20)
+torsoPartLabel.Position = UDim2.new(0, 0, 0, 0)
+torsoPartLabel.BackgroundTransparency = 1
+torsoPartLabel.Text = "Часть тела для удаления:"
+torsoPartLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+torsoPartLabel.TextXAlignment = Enum.TextXAlignment.Left
+torsoPartLabel.Font = Enum.Font.Gotham
+torsoPartLabel.TextSize = 14
+torsoPartLabel.Parent = torsoPartSettings
+
+local torsoPartDropdown = Instance.new("TextButton")
+torsoPartDropdown.Size = UDim2.new(1, 0, 0, 30)
+torsoPartDropdown.Position = UDim2.new(0, 0, 0, 25)
+torsoPartDropdown.BackgroundColor3 = Color3.fromRGB(60, 64, 72)
+torsoPartDropdown.Text = TORSO_PART_TO_REMOVE
+torsoPartDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
+torsoPartDropdown.Font = Enum.Font.Gotham
+torsoPartDropdown.TextSize = 14
+torsoPartDropdown.Parent = torsoPartSettings
+
+local torsoPartCorner = Instance.new("UICorner")
+torsoPartCorner.CornerRadius = UDim.new(0, 6)
+torsoPartCorner.Parent = torsoPartDropdown
+
+-- Список доступных частей тела
+local bodyParts = {"Head", "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg"}
+local currentPartIndex = 1
+
+-- Переключение части тела
+torsoPartDropdown.MouseButton1Click:Connect(function()
+	currentPartIndex = currentPartIndex + 1
+	if currentPartIndex > #bodyParts then
+		currentPartIndex = 1
+	end
+	TORSO_PART_TO_REMOVE = bodyParts[currentPartIndex]
+	torsoPartDropdown.Text = TORSO_PART_TO_REMOVE
+end)
 
 -- Линия прогресса
 local ProgressBackground = Instance.new("Frame")
@@ -317,6 +365,24 @@ local function isNpcAlive(npc)
 	return humanoid and humanoid.Health > 0 and hrp
 end
 
+-- ==================== ФУНКЦИЯ УДАЛЕНИЯ ЧАСТИ ТЕЛА ====================
+local function removeTorsoPart(npc)
+	if not REMOVE_TORSO_PART then return end
+	if not npc or not npc:IsA("Model") then return end
+
+	-- Ищем указанную часть тела
+	local partToRemove = npc:FindFirstChild(TORSO_PART_TO_REMOVE)
+
+	if partToRemove then
+		-- Удаляем часть тела
+		partToRemove:Destroy()
+
+		print("[Auto Killer] Удалена часть тела '" .. TORSO_PART_TO_REMOVE .. "' у NPC: " .. npc.Name)
+	else
+		warn("[Auto Killer] Часть тела '" .. TORSO_PART_TO_REMOVE .. "' не найдена у NPC: " .. npc.Name)
+	end
+end
+
 -- ==================== ОБНОВЛЕНИЕ ПОДСВЕТКИ И GUI ====================
 local function updateHighlights()
 	local npcs = findHumanoids()
@@ -424,6 +490,10 @@ local function killNpcsOnCycle()
 			if npcCycles[npc] >= MAX_CYCLES then
 				local humanoid = npc:FindFirstChildOfClass("Humanoid")
 				if humanoid then
+					-- Сначала удаляем часть тела
+					removeTorsoPart(npc)
+
+					-- Затем убиваем NPC
 					humanoid.Health = 0
 				end
 
@@ -434,6 +504,17 @@ local function killNpcsOnCycle()
 					npcLines[npc].Attachment1:Destroy()
 					npcLines[npc] = nil
 				end
+
+				-- Удаляем GUI и подсветку
+				if npcNameGuis[npc] then
+					npcNameGuis[npc]:Destroy()
+					npcNameGuis[npc] = nil
+				end
+				if npcHighlights[npc] then
+					npcHighlights[npc]:Destroy()
+					npcHighlights[npc] = nil
+				end
+				npcCycles[npc] = nil
 			end
 		end
 	end
@@ -450,29 +531,29 @@ local function updateKillCount()
 	-- Собираем текущих NPC
 	local currentNPCs = {}
 	for _, npc in pairs(findHumanoids()) do
-		local npcName = npc.Name
-		currentNPCs[npcName] = true
+		local name = npc.Name
+		currentNPCs[name] = true
 
-		if not npcDisplayStates[npcName] then
-			npcDisplayStates[npcName] = {type = "green", time = currentTime}
+		if not npcDisplayStates[name] then
+			npcDisplayStates[name] = {type = "green", time = currentTime}
 		end
 
-		killedHumanoidsCount[npcName] = (killedHumanoidsCount[npcName] or 0) + 1
+		killedHumanoidsCount[name] = (killedHumanoidsCount[name] or 0) + 1
 	end
 
 	-- Удаляем состояния для исчезнувших NPC
-	for prevName, _ in pairs(previousCount) do
-		if not currentNPCs[prevName] then
-			npcDisplayStates[prevName] = nil
+	for name, _ in pairs(previousCount) do
+		if not currentNPCs[name] then
+			npcDisplayStates[name] = nil
 		end
 	end
 
 	-- Обновляем состояния
-	for npcName, count in pairs(killedHumanoidsCount) do
-		if not previousCount[npcName] then
-			npcDisplayStates[npcName] = {type = "green", time = currentTime}
-		elseif count ~= previousCount[npcName] then
-			npcDisplayStates[npcName] = {type = "yellow", time = currentTime}
+	for name, count in pairs(killedHumanoidsCount) do
+		if not previousCount[name] then
+			npcDisplayStates[name] = {type = "green", time = currentTime}
+		elseif count ~= previousCount[name] then
+			npcDisplayStates[name] = {type = "yellow", time = currentTime}
 		end
 	end
 
@@ -480,8 +561,8 @@ local function updateKillCount()
 
 	-- Формируем текст
 	local displayText = "Жертвы:\n"
-	for npcName, count in pairs(killedHumanoidsCount) do
-		local state = npcDisplayStates[npcName]
+	for name, count in pairs(killedHumanoidsCount) do
+		local state = npcDisplayStates[name]
 		local elapsed = currentTime - (state and state.time or currentTime)
 		local progress = math.clamp(elapsed / 10, 0, 1)
 
@@ -499,8 +580,14 @@ local function updateKillCount()
 			color = 'rgb(255,255,255)'
 		end
 
+		-- Исправленное формирование строки
+		local countSuffix = ""
+		if count > 1 then
+			countSuffix = " x" .. tostring(count)
+		end
+
 		displayText = displayText .. string.format('<font color="%s">%s%s</font>\n', 
-			color, npcName, count > 1 and " x" .. count or "")
+			color, name, countSuffix)
 	end
 
 	KillCountLabel.Text = displayText
