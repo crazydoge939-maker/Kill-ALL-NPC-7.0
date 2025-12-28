@@ -10,7 +10,6 @@ local LocalPlayer = Players.LocalPlayer
 local MAX_CYCLES = 12 -- Сколько циклов NPC должен выжить перед смертью
 local REMOVE_TORSO_PART = true -- Включить удаление части тела при убийстве
 local TORSO_PART_TO_REMOVE = "Torso" -- Какую часть удалить: "Head", "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg"
-local KILL_RADIUS = 99999 -- Радиус поиска NPC (99999 = безграничный)
 
 -- ==================== СПИСКИ NPC ====================
 -- NPC, которых не нужно убивать
@@ -52,6 +51,18 @@ local npcHighlights = {} -- {npc = Highlight}
 local npcLines = {} -- {npc = {Beam, Attachment0, Attachment1, ...}}
 local isEnabled = true -- состояние режима (включено/выключено)
 
+-- ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ЦВЕТОВ ====================
+-- Получение цвета по типу NPC
+local function getNpcColor(npcName)
+	if doNotKillList[npcName] then
+		return Color3.fromRGB(0, 255, 0) -- Зеленый для защищенных
+	elseif specialNPCs[npcName] then
+		return Color3.fromRGB(255, 255, 0) -- Желтый для особых
+	else
+		return Color3.fromRGB(255, 0, 0) -- Красный для обычных
+	end
+end
+
 -- ==================== СОЗДАНИЕ GUI ====================
 local player = game.Players.LocalPlayer
 local PlayerGui = player:WaitForChild("PlayerGui")
@@ -82,7 +93,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
 Title.Text = "Auto Killer"
-Title.Font = Enum.Font.GothamBold
+Title.Font = Enum.Font.Sarpanch
 Title.TextSize = 20
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Parent = Frame
@@ -91,7 +102,7 @@ local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0, 120, 0, 40)
 ToggleButton.Position = UDim2.new(0, 20, 0, 50)
 ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.Font = Enum.Font.Sarpanch
 ToggleButton.TextSize = 16
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleButton.Text = "Start Kill"
@@ -109,8 +120,8 @@ KillCountLabel.Text = "Жертвы:\n"
 KillCountLabel.TextWrapped = true
 KillCountLabel.TextXAlignment = Enum.TextXAlignment.Left
 KillCountLabel.TextYAlignment = Enum.TextYAlignment.Top
-KillCountLabel.Font = Enum.Font.Gotham
-KillCountLabel.TextSize = 20
+KillCountLabel.Font = Enum.Font.Sarpanch
+KillCountLabel.TextSize = 22
 KillCountLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 KillCountLabel.Parent = Frame
 
@@ -118,7 +129,7 @@ local toggleModeButton = Instance.new("TextButton")
 toggleModeButton.Size = UDim2.new(0, 120, 0, 40)
 toggleModeButton.Position = UDim2.new(0, 150, 0, 50)
 toggleModeButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-toggleModeButton.Font = Enum.Font.GothamBold
+toggleModeButton.Font = Enum.Font.Sarpanch
 toggleModeButton.TextSize = 16
 toggleModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleModeButton.Text = "[OFF] Подсветку"
@@ -198,6 +209,9 @@ progressInnerCorner.Parent = ProgressBar
 
 -- ==================== ФУНКЦИИ ДЛЯ NPC GUI ====================
 local function createNpcGui(npc)
+	-- Получаем цвет по типу NPC
+	local npcColor = getNpcColor(npc.Name)
+
 	-- Создаем BillboardGui
 	local billboardGui = Instance.new("BillboardGui")
 	billboardGui.Name = "NPCInfoGui"
@@ -214,48 +228,46 @@ local function createNpcGui(npc)
 	bgFrame.BackgroundTransparency = 0.5
 	bgFrame.Parent = billboardGui
 
+	-- Обводка фона - цвет как у подсветки и линии
+	local bgStroke = Instance.new("UIStroke")
+	bgStroke.Thickness = 2
+	bgStroke.Color = npcColor -- Цвет обводки как у подсветки и линии
+	bgStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	bgStroke.LineJoinMode = Enum.LineJoinMode.Round
+	bgStroke.Parent = bgFrame
+
 	local bgCorner = Instance.new("UICorner")
 	bgCorner.CornerRadius = UDim.new(0, 8)
 	bgCorner.Parent = bgFrame
 
-	-- Текст с именем и циклами
+	-- Текст с именем NPC - цвет как у подсветки/линии
 	local textLabel = Instance.new("TextLabel")
 	textLabel.Size = UDim2.new(1, 0, 0.6, 0)
 	textLabel.Position = UDim2.new(0, 0, 0, 0)
 	textLabel.BackgroundTransparency = 1
 	textLabel.Text = npc.Name
-	textLabel.TextColor3 = Color3.new(1, 1, 1)
+	textLabel.TextColor3 = npcColor -- Цвет как у подсветки и линии
 	textLabel.TextStrokeTransparency = 0.5
 	textLabel.TextScaled = true
-	textLabel.Font = Enum.Font.GothamBold
+	textLabel.Font = Enum.Font.Sarpanch
 	textLabel.Parent = bgFrame
 
-	-- Текст с циклами [0/3]
+	-- Текст с циклами [0/12]
 	local cycleLabel = Instance.new("TextLabel")
 	cycleLabel.Size = UDim2.new(1, 0, 0.4, 0)
 	cycleLabel.Position = UDim2.new(0, 0, 0.6, 0)
 	cycleLabel.BackgroundTransparency = 1
 	cycleLabel.Text = "[0/" .. MAX_CYCLES .. "]"
-	cycleLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+	cycleLabel.TextColor3 = npcColor -- Цвет как у подсветки и линии
 	cycleLabel.TextStrokeTransparency = 0.5
 	cycleLabel.TextScaled = true
-	cycleLabel.Font = Enum.Font.GothamBold
+	cycleLabel.Font = Enum.Font.Sarpanch
 	cycleLabel.Parent = bgFrame
 
 	billboardGui.Parent = npc
 	npcNameGuis[npc] = billboardGui
 	npcCycleLabels[npc] = cycleLabel
 	npcCycles[npc] = 0 -- Инициализируем цикл NPC
-
-	-- Устанавливаем цвет в зависимости от типа NPC
-	local cycleTextColor
-	if doNotKillList[npc.Name] then
-		cycleLabel.TextColor3 = Color3.fromRGB(100, 255, 100) -- Зеленый для защищенных
-	elseif specialNPCs[npc.Name] then
-		cycleLabel.TextColor3 = Color3.fromRGB(255, 255, 100) -- Желтый для особых
-	else
-		cycleLabel.TextColor3 = Color3.fromRGB(255, 100, 100) -- Красный для обычных
-	end
 end
 
 local function updateNpcCycleDisplay(npc)
@@ -266,6 +278,18 @@ local function updateNpcCycleDisplay(npc)
 		-- Меняем цвет когда близко к смерти
 		if npcCycles[npc] >= MAX_CYCLES - 1 then
 			cycleLabel.TextColor3 = Color3.fromRGB(255, 50, 50) -- Ярко-красный
+
+			-- Также обновляем цвет имени
+			local textLabel = cycleLabel.Parent and cycleLabel.Parent:FindFirstChildOfClass("TextLabel")
+			if textLabel then
+				textLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+			end
+
+			-- Также обновляем цвет обводки
+			local bgFrame = cycleLabel.Parent
+			if bgFrame and bgFrame:FindFirstChild("UIStroke") then
+				bgFrame.UIStroke.Color = Color3.fromRGB(255, 50, 50)
+			end
 		end
 	end
 end
@@ -278,6 +302,8 @@ local function createHighlight(npc)
 	highlight.Enabled = isEnabled
 
 	-- Установка цвета в зависимости от типа NPC
+	local npcColor = getNpcColor(npc.Name)
+
 	if doNotKillList[npc.Name] then
 		highlight.FillColor = Color3.fromRGB(0, 85, 0)
 		highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
@@ -317,15 +343,13 @@ local function createLine(npc)
 	beam.Width0 = 0.15
 	beam.Width1 = 0.15
 
-	-- Установка цвета линии
-	if npc and npc.Name then
-		if doNotKillList[npc.Name] then
-			beam.Color = ColorSequence.new(Color3.fromRGB(0, 255, 0))
-		elseif specialNPCs[npc.Name] then
-			beam.Color = ColorSequence.new(Color3.fromRGB(255, 255, 0))
-		else
-			beam.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
-		end
+	-- Установка цвета линии по типу NPC
+	local npcColor = getNpcColor(npc.Name)
+
+	if doNotKillList[npc.Name] then
+		beam.Color = ColorSequence.new(Color3.fromRGB(0, 255, 0))
+	elseif specialNPCs[npc.Name] then
+		beam.Color = ColorSequence.new(Color3.fromRGB(255, 255, 0))
 	else
 		beam.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
 	end
@@ -350,54 +374,13 @@ end
 -- ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 local function findHumanoids()
 	local npcs = {}
-	local playerCharacter = LocalPlayer.Character
-
-	-- Получаем позицию игрока (или 0,0,0 если нет персонажа)
-	local playerPos = Vector3.new(0, 0, 0)
-	if playerCharacter and playerCharacter:FindFirstChild("HumanoidRootPart") then
-		playerPos = playerCharacter.HumanoidRootPart.Position
-	end
-
-	-- Используем GetPartBoundsInRadius для поиска всех частей в радиусе
-	local partsInRadius = workspace:GetPartBoundsInRadius(playerPos, KILL_RADIUS)
-
-	-- Множество для хранения уже найденных NPC (чтобы избежать дубликатов)
-	local foundNPCs = {}
-
-	for _, part in ipairs(partsInRadius) do
-		if part and part.Parent then
-			-- Поднимаемся вверх по иерархии, чтобы найти модель с Humanoid
-			local model = part.Parent
-			local maxDepth = 5 -- Ограничиваем глубину поиска для производительности
-			local depth = 0
-
-			while depth < maxDepth do
-				if model and model:IsA("Model") then
-					-- Проверяем есть ли Humanoid в модели
-					local humanoid = model:FindFirstChildOfClass("Humanoid")
-					if humanoid then
-						-- Проверяем что это не игрок
-						if not game.Players:GetPlayerFromCharacter(model) then
-							if not foundNPCs[model] then
-								foundNPCs[model] = true
-								table.insert(npcs, model)
-							end
-							break -- Выходим из цикла, нашли NPC
-						end
-					end
-				end
-
-				-- Поднимаемся на уровень выше
-				if model.Parent and model.Parent:IsA("Model") then
-					model = model.Parent
-				else
-					break
-				end
-				depth = depth + 1
+	for _, v in pairs(workspace:GetDescendants()) do
+		if v:IsA("Humanoid") and v.Parent and v.Parent:FindFirstChildOfClass("Humanoid") then
+			if not game.Players:GetPlayerFromCharacter(v.Parent) then
+				table.insert(npcs, v.Parent)
 			end
 		end
 	end
-
 	return npcs
 end
 
