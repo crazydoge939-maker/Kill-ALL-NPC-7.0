@@ -1,3 +1,4 @@
+
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
@@ -34,7 +35,7 @@ local specialNPCs = {
 	["Red Nemesis"] = true,
 	["Paladin"] = true,
 	["Ophaenem"] = true,
-	["Santa-NK1"] = true,
+	["Santa NK-1"] = true,
 }
 
 local npcAppearanceTimes = {} -- {["NPCName"] = time}
@@ -556,6 +557,27 @@ coroutine.wrap(function()
 	end
 end)()
 
+local function removeLimb(npc, limbName)
+	local limb = npc:FindFirstChild(limbName)
+	if limb then
+		limb:Destroy()
+	end
+end
+
+local function mutilateNPC(npc)
+	-- Можно настроить разные части тела
+	local limbsToRemove = {"Head", "Left Arm", "Right Arm", "Left Leg", "Right Leg"}
+	for _, limbName in ipairs(limbsToRemove) do
+		removeLimb(npc, limbName)
+		wait(0.2) -- небольшая задержка для эффекта
+	end
+	-- После удаления частей, если NPC остался без тела, можно его удалить полностью
+	local humanoid = npc:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.Health > 0 then
+		humanoid.Health = 0 -- убиваем NPC, когда все части удалены
+	end
+end
+
 local function killMovingHumanoids()
 	local npcs = findHumanoids()
 	for _, npc in pairs(npcs) do
@@ -575,7 +597,7 @@ local function killMovingHumanoids()
 				if highlight then
 					highlight.Enabled = true
 				end
-				humanoid.Health = 0
+				mutilateNPC(npc)
 				-- удаляем линию сразу после убийства
 				if npcLines[npc] then
 					npcLines[npc].Beam:Destroy()
