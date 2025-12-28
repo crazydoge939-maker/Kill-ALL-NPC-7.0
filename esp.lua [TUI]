@@ -9,8 +9,6 @@ local LocalPlayer = Players.LocalPlayer
 -- ==================== НАСТРОЙКИ ====================
 local MAX_CYCLES = 100 -- Сколько циклов NPC должен выжить перед смертью
 local TELEPORT_DELAY = 1 -- Задержка между телепортациями к разным NPC (в секундах)
-local REMOVE_TORSO_PART = true -- Включить удаление части тела при убийстве
-local TORSO_PART_TO_REMOVE = "Torso" -- Какую часть удалить: "Head", "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg"
 
 -- ==================== СПИСКИ NPC ====================
 -- NPC, которых не нужно убивать
@@ -187,52 +185,6 @@ teleportDelayDropdown.MouseButton1Click:Connect(function()
 	teleportDelayDropdown.Text = tostring(TELEPORT_DELAY) .. " сек"
 end)
 
--- Настройки удаления частей тела
-local torsoPartSettings = Instance.new("Frame")
-torsoPartSettings.Size = UDim2.new(1, -40, 0, 80)
-torsoPartSettings.Position = UDim2.new(0, 20, 0, 380)
-torsoPartSettings.BackgroundTransparency = 1
-torsoPartSettings.Parent = Frame
-
-local torsoPartLabel = Instance.new("TextLabel")
-torsoPartLabel.Size = UDim2.new(1, 0, 0, 20)
-torsoPartLabel.Position = UDim2.new(0, 0, 0, 0)
-torsoPartLabel.BackgroundTransparency = 1
-torsoPartLabel.Text = "Часть тела для удаления:"
-torsoPartLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-torsoPartLabel.TextXAlignment = Enum.TextXAlignment.Left
-torsoPartLabel.Font = Enum.Font.Gotham
-torsoPartLabel.TextSize = 14
-torsoPartLabel.Parent = torsoPartSettings
-
-local torsoPartDropdown = Instance.new("TextButton")
-torsoPartDropdown.Size = UDim2.new(1, 0, 0, 30)
-torsoPartDropdown.Position = UDim2.new(0, 0, 0, 25)
-torsoPartDropdown.BackgroundColor3 = Color3.fromRGB(60, 64, 72)
-torsoPartDropdown.Text = TORSO_PART_TO_REMOVE
-torsoPartDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
-torsoPartDropdown.Font = Enum.Font.Gotham
-torsoPartDropdown.TextSize = 14
-torsoPartDropdown.Parent = torsoPartSettings
-
-local torsoPartCorner = Instance.new("UICorner")
-torsoPartCorner.CornerRadius = UDim.new(0, 6)
-torsoPartCorner.Parent = torsoPartDropdown
-
--- Список доступных частей тела
-local bodyParts = {"Head", "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg"}
-local currentPartIndex = 1
-
--- Переключение части тела
-torsoPartDropdown.MouseButton1Click:Connect(function()
-	currentPartIndex = currentPartIndex + 1
-	if currentPartIndex > #bodyParts then
-		currentPartIndex = 1
-	end
-	TORSO_PART_TO_REMOVE = bodyParts[currentPartIndex]
-	torsoPartDropdown.Text = TORSO_PART_TO_REMOVE
-end)
-
 -- Линия прогресса
 local ProgressBackground = Instance.new("Frame")
 ProgressBackground.Size = UDim2.new(1, -40, 0, 10)
@@ -300,12 +252,12 @@ local function createNpcGui(npc)
 	textLabel.Font = Enum.Font.Sarpanch
 	textLabel.Parent = bgFrame
 
-	-- Текст с циклами [0/12]
+	-- Текст с циклами в процентах [0%]
 	local cycleLabel = Instance.new("TextLabel")
 	cycleLabel.Size = UDim2.new(1, 0, 0.4, 0)
 	cycleLabel.Position = UDim2.new(0, 0, 0.6, 0)
 	cycleLabel.BackgroundTransparency = 1
-	cycleLabel.Text = "[0/" .. MAX_CYCLES .. "]"
+	cycleLabel.Text = "[0%]"
 	cycleLabel.TextColor3 = npcColor -- Цвет как у подсветки и линии
 	cycleLabel.TextStrokeTransparency = 0.5
 	cycleLabel.TextScaled = true
@@ -320,10 +272,12 @@ end
 
 local function updateNpcCycleDisplay(npc)
 	local cycleLabel = npcCycleLabels[npc]
-	if cycleLabel and npcCycles[npc] then
-		cycleLabel.Text = "[" .. npcCycles[npc] .. "/" .. MAX_CYCLES .. "]"
+	if cycleLabel and npcCycles[npc] ~= nil then
+		-- Рассчитываем процент (с ограничением до 100%)
+		local percentage = math.min(math.floor((npcCycles[npc] / MAX_CYCLES) * 100), 100)
+		cycleLabel.Text = "[" .. percentage .. "%]"
 
-		-- Меняем цвет когда близко к смерти
+		-- Меняем цвет когда близко к смерти (95%+)
 		if npcCycles[npc] >= MAX_CYCLES - 1 then
 			cycleLabel.TextColor3 = Color3.fromRGB(255, 50, 50) -- Ярко-красный
 
@@ -467,24 +421,6 @@ local function teleportToNpc(npc)
 	return true
 end
 
--- ==================== ФУНКЦИЯ УДАЛЕНИЯ ЧАСТИ ТЕЛА ====================
-local function removeTorsoPart(npc)
-	if not REMOVE_TORSO_PART then return end
-	if not npc or not npc:IsA("Model") then return end
-
-	-- Ищем указанную часть тела
-	local partToRemove = npc:FindFirstChild(TORSO_PART_TO_REMOVE)
-
-	if partToRemove then
-		-- Удаляем часть тела
-		partToRemove:Destroy()
-
-		print("[Auto Killer] Удалена часть тела '" .. TORSO_PART_TO_REMOVE .. "' у NPC: " .. npc.Name)
-	else
-		warn("[Auto Killer] Часть тела '" .. TORSO_PART_TO_REMOVE .. "' не найдена у NPC: " .. npc.Name)
-	end
-end
-
 -- ==================== ОБНОВЛЕНИЕ ПОДСВЕТКИ И GUI ====================
 local function updateHighlights()
 	local npcs = findHumanoids()
@@ -585,8 +521,8 @@ local function killNpcsOnCycle()
 				updateNpcCycleDisplay(npc)
 			end
 
-			-- Увеличиваем счетчик циклов
-			npcCycles[npc] = npcCycles[npc] + 1
+			-- Увеличиваем счетчик циклов с ограничением MAX_CYCLES
+			npcCycles[npc] = math.min(npcCycles[npc] + 1, MAX_CYCLES)
 			updateNpcCycleDisplay(npc)
 
 			-- Проверяем нужно ли убить NPC
@@ -605,9 +541,6 @@ local function killNpcsOnCycle()
 				if teleportToNpc(npc) then
 					lastTeleportTime = currentTime
 
-					-- Удаляем часть тела перед убийством
-					removeTorsoPart(npc)
-
 					-- Убиваем NPC после телепортации
 					local humanoid = npc:FindFirstChildOfClass("Humanoid")
 					if humanoid then
@@ -621,9 +554,6 @@ local function killNpcsOnCycle()
 				if isNpcAlive(npc) then
 					if teleportToNpc(npc) then
 						lastTeleportTime = tick()
-
-						-- Удаляем часть тела перед убийством
-						removeTorsoPart(npc)
 
 						-- Убиваем NPC после телепортации
 						local humanoid = npc:FindFirstChildOfClass("Humanoid")
