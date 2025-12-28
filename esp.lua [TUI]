@@ -1,16 +1,14 @@
 -- ==================== ОСНОВНЫЕ ПЕРЕМЕННЫЕ ====================
 local isKilling = false
-local killInterval = 1
+local killInterval = 0.1
 local lastKillTime = 0
 local runService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 -- ==================== НАСТРОЙКИ ====================
-local MAX_CYCLES = 12 -- Сколько циклов NPC должен выжить перед смертью
-local REMOVE_TORSO_PART = true -- Включить удаление части тела при убийстве
-local TORSO_PART_TO_REMOVE = "Torso" -- Какую часть удалить: "Head", "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg"
-local KILL_DISTANCE = nil -- Радиус убийства (nil = бесконечно/любое расстояние, число = максимальное расстояние в studs)
+local MAX_CYCLES = 100 -- Сколько циклов NPC должен выжить перед смертью
+local TELEPORT_DELAY = 0.2 -- Задержка между телепортациями к разным NPC (в секундах)
 
 -- ==================== СПИСКИ NPC ====================
 -- NPC, которых не нужно убивать
@@ -51,6 +49,7 @@ local npcCycles = {} -- {npc = currentCycle} -- текущий цикл NPC
 local npcHighlights = {} -- {npc = Highlight}
 local npcLines = {} -- {npc = {Beam, Attachment0, Attachment1, ...}}
 local isEnabled = true -- состояние режима (включено/выключено)
+local lastTeleportTime = 0 -- время последней телепортации
 
 -- ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ЦВЕТОВ ====================
 -- Получение цвета по типу NPC
@@ -73,7 +72,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 300, 0, 480)
+Frame.Size = UDim2.new(0, 300, 0, 400)
 Frame.Position = UDim2.new(0, 20, 0, 20)
 Frame.BackgroundColor3 = Color3.fromRGB(40, 44, 52)
 Frame.BorderSizePixel = 0
@@ -115,7 +114,7 @@ buttonCorner.Parent = ToggleButton
 
 local KillCountLabel = Instance.new("TextLabel")
 KillCountLabel.Size = UDim2.new(1, -40, 0, 430)
-KillCountLabel.Position = UDim2.new(0, 20, 0, 130)
+KillCountLabel.Position = UDim2.new(0, 20, 0, 100)
 KillCountLabel.BackgroundTransparency = 1
 KillCountLabel.Text = "Жертвы:\n"
 KillCountLabel.TextWrapped = true
@@ -140,101 +139,50 @@ local buttonCorner2 = Instance.new("UICorner")
 buttonCorner2.CornerRadius = UDim.new(0, 8)
 buttonCorner2.Parent = toggleModeButton
 
--- Настройки удаления частей тела
-local torsoPartSettings = Instance.new("Frame")
-torsoPartSettings.Size = UDim2.new(1, -40, 0, 80)
-torsoPartSettings.Position = UDim2.new(0, 20, 0, 400)
-torsoPartSettings.BackgroundTransparency = 1
-torsoPartSettings.Parent = Frame
+-- Настройки задержки телепортации
+local teleportDelaySettings = Instance.new("Frame")
+teleportDelaySettings.Size = UDim2.new(1, -40, 0, 60)
+teleportDelaySettings.Position = UDim2.new(0, 20, 0, 340)
+teleportDelaySettings.BackgroundTransparency = 1
+teleportDelaySettings.Parent = Frame
 
-local torsoPartLabel = Instance.new("TextLabel")
-torsoPartLabel.Size = UDim2.new(1, 0, 0, 20)
-torsoPartLabel.Position = UDim2.new(0, 0, 0, 0)
-torsoPartLabel.BackgroundTransparency = 1
-torsoPartLabel.Text = "Часть тела для удаления:"
-torsoPartLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-torsoPartLabel.TextXAlignment = Enum.TextXAlignment.Left
-torsoPartLabel.Font = Enum.Font.Gotham
-torsoPartLabel.TextSize = 14
-torsoPartLabel.Parent = torsoPartSettings
+local teleportDelayLabel = Instance.new("TextLabel")
+teleportDelayLabel.Size = UDim2.new(1, 0, 0, 20)
+teleportDelayLabel.Position = UDim2.new(0, 0, 0, 0)
+teleportDelayLabel.BackgroundTransparency = 1
+teleportDelayLabel.Text = "Задержка между TP:"
+teleportDelayLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+teleportDelayLabel.TextXAlignment = Enum.TextXAlignment.Left
+teleportDelayLabel.Font = Enum.Font.Gotham
+teleportDelayLabel.TextSize = 14
+teleportDelayLabel.Parent = teleportDelaySettings
 
-local torsoPartDropdown = Instance.new("TextButton")
-torsoPartDropdown.Size = UDim2.new(1, 0, 0, 30)
-torsoPartDropdown.Position = UDim2.new(0, 0, 0, 25)
-torsoPartDropdown.BackgroundColor3 = Color3.fromRGB(60, 64, 72)
-torsoPartDropdown.Text = TORSO_PART_TO_REMOVE
-torsoPartDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
-torsoPartDropdown.Font = Enum.Font.Gotham
-torsoPartDropdown.TextSize = 14
-torsoPartDropdown.Parent = torsoPartSettings
+local teleportDelayDropdown = Instance.new("TextButton")
+teleportDelayDropdown.Size = UDim2.new(1, 0, 0, 30)
+teleportDelayDropdown.Position = UDim2.new(0, 0, 0, 25)
+teleportDelayDropdown.BackgroundColor3 = Color3.fromRGB(60, 64, 72)
+teleportDelayDropdown.Text = tostring(TELEPORT_DELAY) .. " сек"
+teleportDelayDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
+teleportDelayDropdown.Font = Enum.Font.Gotham
+teleportDelayDropdown.TextSize = 14
+teleportDelayDropdown.Parent = teleportDelaySettings
 
-local torsoPartCorner = Instance.new("UICorner")
-torsoPartCorner.CornerRadius = UDim.new(0, 6)
-torsoPartCorner.Parent = torsoPartDropdown
+local teleportDelayCorner = Instance.new("UICorner")
+teleportDelayCorner.CornerRadius = UDim.new(0, 6)
+teleportDelayCorner.Parent = teleportDelayDropdown
 
--- Список доступных частей тела
-local bodyParts = {"Head", "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg"}
-local currentPartIndex = 1
+-- Список доступных задержек
+local delayOptions = {0.1, 0.25, 0.5, 1, 2, 3}
+local currentDelayIndex = 3 -- по умолчанию 0.5 сек
 
--- Переключение части тела
-torsoPartDropdown.MouseButton1Click:Connect(function()
-	currentPartIndex = currentPartIndex + 1
-	if currentPartIndex > #bodyParts then
-		currentPartIndex = 1
+-- Переключение задержки телепортации
+teleportDelayDropdown.MouseButton1Click:Connect(function()
+	currentDelayIndex = currentDelayIndex + 1
+	if currentDelayIndex > #delayOptions then
+		currentDelayIndex = 1
 	end
-	TORSO_PART_TO_REMOVE = bodyParts[currentPartIndex]
-	torsoPartDropdown.Text = TORSO_PART_TO_REMOVE
-end)
-
--- Настройки радиуса убийства
-local killDistanceSettings = Instance.new("Frame")
-killDistanceSettings.Size = UDim2.new(1, -40, 0, 60)
-killDistanceSettings.Position = UDim2.new(0, 20, 0, 340)
-killDistanceSettings.BackgroundTransparency = 1
-killDistanceSettings.Parent = Frame
-
-local killDistanceLabel = Instance.new("TextLabel")
-killDistanceLabel.Size = UDim2.new(1, 0, 0, 20)
-killDistanceLabel.Position = UDim2.new(0, 0, 0, 0)
-killDistanceLabel.BackgroundTransparency = 1
-killDistanceLabel.Text = "Радиус убийства:"
-killDistanceLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-killDistanceLabel.TextXAlignment = Enum.TextXAlignment.Left
-killDistanceLabel.Font = Enum.Font.Gotham
-killDistanceLabel.TextSize = 14
-killDistanceLabel.Parent = killDistanceSettings
-
-local killDistanceDropdown = Instance.new("TextButton")
-killDistanceDropdown.Size = UDim2.new(1, 0, 0, 30)
-killDistanceDropdown.Position = UDim2.new(0, 0, 0, 25)
-killDistanceDropdown.BackgroundColor3 = Color3.fromRGB(60, 64, 72)
-killDistanceDropdown.Text = KILL_DISTANCE == nil and "∞ (Любое)" or tostring(KILL_DISTANCE) .. " studs"
-killDistanceDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
-killDistanceDropdown.Font = Enum.Font.Gotham
-killDistanceDropdown.TextSize = 14
-killDistanceDropdown.Parent = killDistanceSettings
-
-local killDistanceCorner = Instance.new("UICorner")
-killDistanceCorner.CornerRadius = UDim.new(0, 6)
-killDistanceCorner.Parent = killDistanceDropdown
-
--- Список доступных радиусов
-local distanceOptions = {nil, 50, 100, 200, 500, 1000}
-local currentDistanceIndex = 1
-
--- Переключение радиуса убийства
-killDistanceDropdown.MouseButton1Click:Connect(function()
-	currentDistanceIndex = currentDistanceIndex + 1
-	if currentDistanceIndex > #distanceOptions then
-		currentDistanceIndex = 1
-	end
-	KILL_DISTANCE = distanceOptions[currentDistanceIndex]
-
-	if KILL_DISTANCE == nil then
-		killDistanceDropdown.Text = "∞ (Любое)"
-	else
-		killDistanceDropdown.Text = tostring(KILL_DISTANCE) .. " studs"
-	end
+	TELEPORT_DELAY = delayOptions[currentDelayIndex]
+	teleportDelayDropdown.Text = tostring(TELEPORT_DELAY) .. " сек"
 end)
 
 -- Линия прогресса
@@ -313,7 +261,7 @@ local function createNpcGui(npc)
 	cycleLabel.TextColor3 = npcColor -- Цвет как у подсветки и линии
 	cycleLabel.TextStrokeTransparency = 0.5
 	cycleLabel.TextScaled = true
-	textLabel.Font = Enum.Font.Sarpanch
+	cycleLabel.Font = Enum.Font.Sarpanch
 	cycleLabel.Parent = bgFrame
 
 	billboardGui.Parent = npc
@@ -454,44 +402,21 @@ local function getPlayerPosition()
 	return nil
 end
 
--- Проверка расстояния до NPC
-local function isNpcInRange(npc)
-	local playerPos = getPlayerPosition()
-	if not playerPos then
-		return false
-	end
+-- Телепортация к NPC
+local function teleportToNpc(npc)
+	local playerCharacter = LocalPlayer.Character
+	if not playerCharacter then return false end
 
+	local playerHrp = playerCharacter:FindFirstChild("HumanoidRootPart")
 	local npcHrp = npc:FindFirstChild("HumanoidRootPart")
-	if not npcHrp then
-		return false
-	end
 
-	-- Если KILL_DISTANCE = nil, убиваем всех (любое расстояние)
-	if KILL_DISTANCE == nil then
-		return true
-	end
+	if not playerHrp or not npcHrp then return false end
 
-	-- Иначе проверяем расстояние
-	local distance = (playerPos - npcHrp.Position).Magnitude
-	return distance <= KILL_DISTANCE
-end
+	-- Телепортируем игрока к NPC
+	playerHrp.CFrame = npcHrp.CFrame + Vector3.new(0, 3, 0) -- Немного выше NPC
 
--- ==================== ФУНКЦИЯ УДАЛЕНИЯ ЧАСТИ ТЕЛА ====================
-local function removeTorsoPart(npc)
-	if not REMOVE_TORSO_PART then return end
-	if not npc or not npc:IsA("Model") then return end
-
-	-- Ищем указанную часть тела
-	local partToRemove = npc:FindFirstChild(TORSO_PART_TO_REMOVE)
-
-	if partToRemove then
-		-- Удаляем часть тела
-		partToRemove:Destroy()
-
-		print("[Auto Killer] Удалена часть тела '" .. TORSO_PART_TO_REMOVE .. "' у NPC: " .. npc.Name)
-	else
-		warn("[Auto Killer] Часть тела '" .. TORSO_PART_TO_REMOVE .. "' не найдена у NPC: " .. npc.Name)
-	end
+	print("[Auto Killer] Телепортировался к NPC: " .. npc.Name)
+	return true
 end
 
 -- ==================== ОБНОВЛЕНИЕ ПОДСВЕТКИ И GUI ====================
@@ -571,9 +496,14 @@ local function updateLines()
 	end
 end
 
--- ==================== СИСТЕМА УБИЙСТВА ====================
+-- ==================== СИСТЕМА УБИЙСТВА С ТЕЛЕПОРТАЦИЕЙ ====================
 local function killNpcsOnCycle()
+	local currentTime = tick()
 	local npcs = findHumanoids()
+
+	-- Собираем NPC для убийства
+	local npcsToKill = {}
+	local npcsToTeleport = {}
 
 	for _, npc in pairs(npcs) do
 		if isNpcAlive(npc) then
@@ -582,11 +512,6 @@ local function killNpcsOnCycle()
 			-- Пропускаем защищенных NPC
 			if doNotKillList[name] then
 				continue
-			end
-
-			-- Проверяем расстояние до NPC (исправление бага с радиусом)
-			if not isNpcInRange(npc) then
-				continue -- Пропускаем если NPC вне радиуса
 			end
 
 			-- Инициализируем цикл если еще нет
@@ -601,35 +526,62 @@ local function killNpcsOnCycle()
 
 			-- Проверяем нужно ли убить NPC
 			if npcCycles[npc] >= MAX_CYCLES then
-				local humanoid = npc:FindFirstChildOfClass("Humanoid")
-				if humanoid then
-					-- Сначала удаляем часть тела
-					removeTorsoPart(npc)
-
-					-- Затем убиваем NPC
-					humanoid.Health = 0
-				end
-
-				-- Удаляем линию сразу после убийства
-				if npcLines[npc] then
-					npcLines[npc].Beam:Destroy()
-					npcLines[npc].Attachment0:Destroy()
-					npcLines[npc].Attachment1:Destroy()
-					npcLines[npc] = nil
-				end
-
-				-- Удаляем GUI и подсветку
-				if npcNameGuis[npc] then
-					npcNameGuis[npc]:Destroy()
-					npcNameGuis[npc] = nil
-				end
-				if npcHighlights[npc] then
-					npcHighlights[npc]:Destroy()
-					npcHighlights[npc] = nil
-				end
-				npcCycles[npc] = nil
+				table.insert(npcsToKill, npc)
 			end
 		end
+	end
+
+	-- Телепортируемся к NPC с одинаковым циклом по очереди
+	for _, npc in ipairs(npcsToKill) do
+		if isNpcAlive(npc) then
+			-- Проверяем задержку между телепортациями
+			if currentTime - lastTeleportTime >= TELEPORT_DELAY then
+				-- Телепортируемся к NPC
+				if teleportToNpc(npc) then
+					lastTeleportTime = currentTime
+
+					-- Убиваем NPC после телепортации
+					local humanoid = npc:FindFirstChildOfClass("Humanoid")
+					if humanoid then
+						humanoid.Health = 0
+					end
+				end
+			else
+				-- Ждем оставшееся время и телепортируемся
+				wait(TELEPORT_DELAY - (currentTime - lastTeleportTime))
+
+				if isNpcAlive(npc) then
+					if teleportToNpc(npc) then
+						lastTeleportTime = tick()
+
+						-- Убиваем NPC после телепортации
+						local humanoid = npc:FindFirstChildOfClass("Humanoid")
+						if humanoid then
+							humanoid.Health = 0
+						end
+					end
+				end
+			end
+		end
+
+		-- Удаляем линию после убийства
+		if npcLines[npc] then
+			npcLines[npc].Beam:Destroy()
+			npcLines[npc].Attachment0:Destroy()
+			npcLines[npc].Attachment1:Destroy()
+			npcLines[npc] = nil
+		end
+
+		-- Удаляем GUI и подсветку
+		if npcNameGuis[npc] then
+			npcNameGuis[npc]:Destroy()
+			npcNameGuis[npc] = nil
+		end
+		if npcHighlights[npc] then
+			npcHighlights[npc]:Destroy()
+			npcHighlights[npc] = nil
+		end
+		npcCycles[npc] = nil
 	end
 end
 
