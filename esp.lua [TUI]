@@ -1,4 +1,3 @@
-
 -- Основные переменные
 local isKilling = false
 local killInterval = 5
@@ -40,7 +39,10 @@ local specialNPCs = {
 
 local npcAppearanceTimes = {} -- {["NPCName"] = time}
 local npcDisplayStates = {} -- {["NPCName"] = {type="green"|"yellow", time=timestamp}}
+
+local npcCycleGuis = {} -- таблица для хранения GUI над NPC
 local npcNameGuis = {} -- таблица для хранения GUI над NPC
+local npcCycleCount = {} -- таблица счетчиков
 
 local isEnabled = true -- состояние режима (включено/выключено)
 
@@ -165,6 +167,34 @@ local function createNameGui(npc)
 	end
 end
 
+local function createCycleCountGui(npc)
+	local billboardGui = Instance.new("BillboardGui")
+	billboardGui.Name = "CycleCountGui"
+	billboardGui.Adornee = npc
+	billboardGui.Size = UDim2.new(0, 50, 0, 20)
+	billboardGui.StudsOffset = Vector3.new(0, 3, 0)
+	billboardGui.AlwaysOnTop = true
+
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Size = UDim2.new(1, 0, 1, 0)
+	textLabel.BackgroundTransparency = 1
+	textLabel.Text = "[0/3]"
+	textLabel.TextColor3 = Color3.new(1, 1, 1)
+	textLabel.TextStrokeTransparency = 0
+	textLabel.TextScaled = true
+	textLabel.Font = Enum.Font.GothamBold
+	textLabel.Parent = billboardGui
+
+	billboardGui.Parent = npc
+	npc:GetAttributeChangedSignal("CycleCountGui") -- чтобы знать, когда обновлять
+	npc:SetAttribute("CycleCountGui", true) -- чтобы триггерить обновление
+	npc:GetAttributeChangedSignal("CycleCount") -- чтобы знать, когда обновлять
+	-- Создаем атрибут для хранения прогресса
+	if not npc:GetAttribute("CycleCount") then
+		npc:SetAttribute("CycleCount", 0)
+	end
+end
+
 local function toggleKilling()
 	isKilling = not isKilling
 	if isKilling then
@@ -179,12 +209,21 @@ end
 
 ToggleButton.MouseButton1Click:Connect(toggleKilling)
 
+local npcCycleGuis = {} -- таблица для хранения GUI над NPC
+
 local function findHumanoids()
 	local npcs = {}
 	for _, v in pairs(workspace:GetDescendants()) do
 		if v:IsA("Humanoid") and v.Parent and v.Parent:FindFirstChildOfClass("Humanoid") then
 			if not game.Players:GetPlayerFromCharacter(v.Parent) then
-				table.insert(npcs, v.Parent)
+				local npcModel = v.Parent
+				if not npcAppearanceTimes[npcModel] then
+					npcAppearanceTimes[npcModel] = tick()
+				end
+				if not npcCycleGuis[npcModel] then
+					createCycleCountGui(npcModel)
+				end
+				table.insert(npcs, npcModel)
 			end
 		end
 	end
@@ -290,8 +329,19 @@ end
 
 local function isNpcAlive(npc)
 	local humanoid = npc:FindFirstChildOfClass("Humanoid")
-	local hrp = npc:FindFirstChild("HumanoidRootPart")
-	return humanoid and humanoid.Health > 0 and hrp
+	return humanoid and humanoid.Health > 0
+end
+
+local function removeNpc(npc)
+	if npc then
+		npcAppearanceTimes[npc] = nil
+		npcCycleCount[npc] = nil
+		if npcCycleGuis[npc] then
+			npcCycleGuis[npc]:Destroy()
+			npcCycleGuis[npc] = nil
+		end
+		npc:Destroy()
+	end
 end
 
 local npcLines = {}
@@ -578,37 +628,65 @@ local function mutilateNPC(npc)
 	end
 end
 
-local function killMovingHumanoids()
+local function killNPCAfterCycles()
 	local npcs = findHumanoids()
 	for _, npc in pairs(npcs) do
 		if isNpcAlive(npc) then
 			local name = npc.Name
-			-- Проверка, есть ли NPC в списке не убивать
 			if doNotKillList[name] then
 				continue
 			end
 
-			local humanoid = npc:FindFirstChildOfClass("Humanoid")
-			local hrp = npc:FindFirstChild("HumanoidRootPart")
-			local velocity = hrp.AssemblyLinearVelocity
-			local speed = velocity.Magnitude
-			if speed > 1 then
-				local highlight = npcHighlights[npc]
-				if highlight then
-					highlight.Enabled = true
+			-- увеличиваем счетчик
+			if not npcCycleCount[npc] then
+				npcCycleCount[npc] = 1
+			else
+				npcCycleCount[npc] = npcCycleCount[npc] + 1
+			end
+
+			-- обновляем атрибут
+			npc:SetAttribute("CycleCount", npcCycleCount[npc])
+
+			-- если достигли 3, убиваем
+			if npcCycleCount[npc] >= 3 then
+				local humanoid = npc:FindFirstChildOfClass("Humanoid")
+				if humanoid and humanoid.Health > 0 then
+					humanoid.Health = 0 -- убиваем
 				end
-				mutilateNPC(npc)
-				-- удаляем линию сразу после убийства
-				if npcLines[npc] then
-					npcLines[npc].Beam:Destroy()
-					npcLines[npc].Attachment0:Destroy()
-					npcLines[npc].Attachment1:Destroy()
-					npcLines[npc] = nil
-				end
+				removeNpc(npc)
+			end
+		else
+			-- NPC умер, сбрасываем
+			npcAppearanceTimes[npc] = nil
+			npcCycleCount[npc] = nil
+			if npcCycleGuis[npc] then
+				npcCycleGuis[npc]:Destroy()
+				npcCycleGuis[npc] = nil
 			end
 		end
 	end
 end
+
+local function updateNpcCycleGuis()
+	for npc, gui in pairs(npcCycleGuis) do
+		if npc and npc.Parent then
+			local cycleCount = npc:GetAttribute("CycleCount") or 0
+			local textLabel = gui:FindFirstChildOfClass("TextLabel")
+			if textLabel then
+				textLabel.Text = string.format("[%d/3]", cycleCount)
+			end
+		end
+	end
+end
+
+-- Основной цикл
+coroutine.wrap(function()
+	while true do
+		wait(0.5)
+		killNPCAfterCycles()
+		updateNpcCycleGuis()
+	end
+end)()
 
 -- Основной цикл
 runService.Heartbeat:Connect(function()
@@ -619,7 +697,7 @@ runService.Heartbeat:Connect(function()
 		ProgressBar.Size = UDim2.new(progress, 0, 1, 0)
 
 		if elapsed >= killInterval then
-			killMovingHumanoids()
+			killNPCAfterCycles()
 			lastKillTime = currentTime
 			updateKillCount()
 		end
