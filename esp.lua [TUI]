@@ -8,7 +8,7 @@ local LocalPlayer = Players.LocalPlayer
 
 -- ==================== НАСТРОЙКИ ====================
 local MAX_CYCLES = 100 -- Сколько циклов NPC должен выжить перед смертью
-local TELEPORT_DELAY = 0.15 -- Задержка между телепортациями к разным NPC (в секундах)
+local TELEPORT_DELAY = 1 -- Задержка между телепортациями к разным NPC (в секундах)
 local REMOVE_TORSO_PART = true -- Включить удаление части тела при убийстве
 local TORSO_PART_TO_REMOVE = "Torso" -- Какую часть удалить: "Head", "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg"
 
@@ -174,7 +174,7 @@ teleportDelayCorner.CornerRadius = UDim.new(0, 6)
 teleportDelayCorner.Parent = teleportDelayDropdown
 
 -- Список доступных задержек
-local delayOptions = {0.15, 0.2, 0.3, 0.4, 0.5, 1}
+local delayOptions = {0.5, 1, 2, 3, 4, 5}
 local currentDelayIndex = 3 -- по умолчанию 0.5 сек
 
 -- Переключение задержки телепортации
