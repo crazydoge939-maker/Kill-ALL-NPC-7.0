@@ -7,9 +7,10 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 -- ==================== НАСТРОЙКИ ====================
-local MAX_CYCLES = 15 -- Сколько циклов NPC должен выжить перед смертью
+local MAX_CYCLES = 12 -- Сколько циклов NPC должен выжить перед смертью
 local REMOVE_TORSO_PART = true -- Включить удаление части тела при убийстве
 local TORSO_PART_TO_REMOVE = "Torso" -- Какую часть удалить: "Head", "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg"
+local KILL_RADIUS = 99999 -- Радиус поиска NPC (99999 = безграничный)
 
 -- ==================== СПИСКИ NPC ====================
 -- NPC, которых не нужно убивать
@@ -349,13 +350,54 @@ end
 -- ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 local function findHumanoids()
 	local npcs = {}
-	for _, v in pairs(workspace:GetDescendants()) do
-		if v:IsA("Humanoid") and v.Parent and v.Parent:FindFirstChildOfClass("Humanoid") then
-			if not game.Players:GetPlayerFromCharacter(v.Parent) then
-				table.insert(npcs, v.Parent)
+	local playerCharacter = LocalPlayer.Character
+
+	-- Получаем позицию игрока (или 0,0,0 если нет персонажа)
+	local playerPos = Vector3.new(0, 0, 0)
+	if playerCharacter and playerCharacter:FindFirstChild("HumanoidRootPart") then
+		playerPos = playerCharacter.HumanoidRootPart.Position
+	end
+
+	-- Используем GetPartBoundsInRadius для поиска всех частей в радиусе
+	local partsInRadius = workspace:GetPartBoundsInRadius(playerPos, KILL_RADIUS)
+
+	-- Множество для хранения уже найденных NPC (чтобы избежать дубликатов)
+	local foundNPCs = {}
+
+	for _, part in ipairs(partsInRadius) do
+		if part and part.Parent then
+			-- Поднимаемся вверх по иерархии, чтобы найти модель с Humanoid
+			local model = part.Parent
+			local maxDepth = 5 -- Ограничиваем глубину поиска для производительности
+			local depth = 0
+
+			while depth < maxDepth do
+				if model and model:IsA("Model") then
+					-- Проверяем есть ли Humanoid в модели
+					local humanoid = model:FindFirstChildOfClass("Humanoid")
+					if humanoid then
+						-- Проверяем что это не игрок
+						if not game.Players:GetPlayerFromCharacter(model) then
+							if not foundNPCs[model] then
+								foundNPCs[model] = true
+								table.insert(npcs, model)
+							end
+							break -- Выходим из цикла, нашли NPC
+						end
+					end
+				end
+
+				-- Поднимаемся на уровень выше
+				if model.Parent and model.Parent:IsA("Model") then
+					model = model.Parent
+				else
+					break
+				end
+				depth = depth + 1
 			end
 		end
 	end
+
 	return npcs
 end
 
