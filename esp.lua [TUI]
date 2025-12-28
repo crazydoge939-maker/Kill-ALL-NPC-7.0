@@ -172,7 +172,7 @@ teleportDelayCorner.CornerRadius = UDim.new(0, 6)
 teleportDelayCorner.Parent = teleportDelayDropdown
 
 -- Список доступных задержек
-local delayOptions = {0.1, 0.25, 0.5, 1, 2, 3}
+local delayOptions = {0.25, 0.3, 0.4, 0.5, 1, 2}
 local currentDelayIndex = 3 -- по умолчанию 0.5 сек
 
 -- Переключение задержки телепортации
