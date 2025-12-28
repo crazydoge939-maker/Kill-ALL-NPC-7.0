@@ -148,7 +148,7 @@ teleportDelaySettings.Parent = Frame
 
 local teleportDelayLabel = Instance.new("TextLabel")
 teleportDelayLabel.Size = UDim2.new(1, 0, 0, 20)
-teleportDelayLabel.Position = UDim2.new(0, 0, 0, 0)
+teleportDelayLabel.Position = UDim2.new(0, 0, 0, 55)
 teleportDelayLabel.BackgroundTransparency = 1
 teleportDelayLabel.Text = "Задержка между TP:"
 teleportDelayLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -159,7 +159,7 @@ teleportDelayLabel.Parent = teleportDelaySettings
 
 local teleportDelayDropdown = Instance.new("TextButton")
 teleportDelayDropdown.Size = UDim2.new(1, 0, 0, 30)
-teleportDelayDropdown.Position = UDim2.new(0, 0, 0, 25)
+teleportDelayDropdown.Position = UDim2.new(0, 0, 0, 75)
 teleportDelayDropdown.BackgroundColor3 = Color3.fromRGB(60, 64, 72)
 teleportDelayDropdown.Text = tostring(TELEPORT_DELAY) .. " сек"
 teleportDelayDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
