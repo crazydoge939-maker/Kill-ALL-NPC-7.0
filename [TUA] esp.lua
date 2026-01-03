@@ -8,7 +8,9 @@ local LocalPlayer = Players.LocalPlayer
 
 -- ==================== НАСТРОЙКИ ====================
 local MAX_CYCLES = 0 -- Сколько циклов NPC должен выжить перед смертью
-local TELEPORT_DELAY = 1 -- Задержка между телепортациями к разным NPC (в секундах)
+local TELEPORT_DELAY = 2 -- Увеличено время между телепортами, чтобы снизить нагрузку
+local npcKillQueue = {} -- очередь для порционной убийства
+local MAX_NPCS_PER_CYCLE = 1 -- максимальное число NPC за раз
 
 -- ==================== СПИСКИ NPC ====================
 -- NPC, которых не нужно убивать
@@ -204,7 +206,7 @@ local progressInnerCorner = Instance.new("UICorner")
 progressInnerCorner.CornerRadius = UDim.new(0, 5)
 progressInnerCorner.Parent = ProgressBar
 
--- ==================== ФУНКЦИИ ДЛЯ NPC GUI ====================
+-- ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 local function createNpcGui(npc)
 	local npcColor = getNpcColor(npc.Name)
 	if ignoreList[npc.Name] then return end
@@ -281,9 +283,10 @@ local function findHumanoids()
 end
 
 local function isNpcAlive(npc)
+	if not npc then return false end
 	local humanoid = npc:FindFirstChildOfClass("Humanoid")
 	local hrp = npc:FindFirstChild("HumanoidRootPart")
-	return humanoid and humanoid.Health > 0 and hrp
+	return humanoid ~= nil and humanoid.Health > 0 and hrp ~= nil
 end
 
 local function getPlayerPosition()
@@ -402,62 +405,38 @@ local function updateHighlights()
 	end
 end
 
-local function killNpcsOnCycle()
-	local currentTime = tick()
+local function killNpc(npc)
+	if not isNpcAlive(npc) then return end
+	local humanoid = npc:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.Health > 0 then
+		humanoid.Health = 0
+	end
+end
+
+local function enqueueNpcsToKill()
 	local npcs = findHumanoids()
-	local npcsToKill = {}
-
-	for _, npc in pairs(npcs) do
-		if isNpcAlive(npc) then
-			local name = npc.Name
-			if doNotKillList[name] then continue end
-
-			-- Проверка, что NPC жив, и если не — его убить
-			local humanoid = npc:FindFirstChildOfClass("Humanoid")
-			if humanoid and humanoid.Health > 0 then
-				-- Увеличиваем счетчик циклов
-				if not npcCycles[npc] then
-					npcCycles[npc] = 0
-				end
-				npcCycles[npc] = math.min(npcCycles[npc] + 1, MAX_CYCLES)
-				updateNpcCycleDisplay(npc)
-
-				-- Если достигли максимума циклов, убиваем
-				if npcCycles[npc] >= MAX_CYCLES then
-					table.insert(npcsToKill, npc)
-				end
-			end
+	for _, npc in ipairs(npcs) do
+		if isNpcAlive(npc) and not doNotKillList[npc.Name] and not ignoreList[npc.Name] then
+			table.insert(npcKillQueue, npc)
 		end
 	end
+end
 
-	-- Убиваем NPC
-	for _, npc in ipairs(npcsToKill) do
+local function processKillQueue()
+	local count = 0
+	for i = #npcKillQueue, 1, -1 do
+		local npc = npcKillQueue[i]
 		if isNpcAlive(npc) then
-			if not ignoreList[npc.Name] then
-				if currentTime - lastTeleportTime >= TELEPORT_DELAY then
-					if teleportToNpc(npc) then
-						lastTeleportTime = currentTime
-						local humanoid = npc:FindFirstChildOfClass("Humanoid")
-						if humanoid and humanoid.Health > 0 then
-							humanoid.Health = 0
-						end
-					end
-				else
-					wait(TELEPORT_DELAY - (currentTime - lastTeleportTime))
-					if not ignoreList[npc.Name] then
-						if teleportToNpc(npc) then
-							lastTeleportTime = tick()
-							local humanoid = npc:FindFirstChildOfClass("Humanoid")
-							if humanoid and humanoid.Health > 0 then
-								humanoid.Health = 0
-							end
-						end
-					end
-				end
+			if teleportToNpc(npc) then
+				wait(0.1)
+				killNpc(npc)
 			end
 		end
-		-- Очистка данных NPC
-		cleanupNpcData(npc)
+		table.remove(npcKillQueue, i)
+		count = count + 1
+		if count >= MAX_NPCS_PER_CYCLE then
+			break
+		end
 	end
 end
 
@@ -471,7 +450,6 @@ local function updateKillCount()
 	local currentNPCs = {}
 	for _, npc in pairs(findHumanoids()) do
 		local name = npc.Name
-		-- пропускаем, если NPC в списке игнорирования
 		if ignoreList[name] then
 			continue
 		end
@@ -513,11 +491,9 @@ local function updateKillCount()
 		if count > 1 then
 			countSuffix = " x" .. tostring(count)
 		end
-		-- Не добавляем в список, если NPC в игнор-листе
 		if ignoreList[name] then
 			continue
 		end
-		-- В противном случае отображаем
 		displayText = displayText .. string.format('<font color="%s">%s%s</font>\n', color, name, countSuffix)
 	end
 	KillCountLabel.Text = displayText
@@ -530,6 +506,7 @@ local function toggleKilling()
 		ToggleButton.Text = "[Stop] Kill"
 		ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 		lastKillTime = tick()
+		enqueueNpcsToKill() -- Заранее заполняем очередь
 	else
 		ToggleButton.Text = "[Start] Kill"
 		ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
@@ -573,7 +550,8 @@ runService.Heartbeat:Connect(function()
 		local progress = math.min(elapsed / killInterval, 1)
 		ProgressBar.Size = UDim2.new(progress, 0, 1, 0)
 		if elapsed >= killInterval then
-			killNpcsOnCycle()
+			enqueueNpcsToKill()
+			processKillQueue()
 			lastKillTime = currentTime
 			updateKillCount()
 		end
@@ -610,29 +588,3 @@ coroutine.wrap(function()
 		updateKillCount()
 	end
 end)()
-
--- ==================== ПЕРЕТАСКИВАНИЕ GUI ====================
-local dragging = false
-local dragStart
-local startPos
-
-Frame.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = true
-		dragStart = input.Position
-		startPos = Frame.Position
-	end
-end)
-
-Frame.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = false
-	end
-end)
-
-Frame.InputChanged:Connect(function(input)
-	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-		local delta = input.Position - dragStart
-		Frame.Position = startPos + UDim2.new(0, delta.X, 0, delta.Y)
-	end
-end)
