@@ -7,30 +7,35 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 -- ==================== НАСТРОЙКИ ====================
-local MAX_CYCLES = 4 -- Сколько циклов NPC должен выжить перед смертью
+local MAX_CYCLES = 0 -- Сколько циклов NPC должен выжить перед смертью
 local TELEPORT_DELAY = 1 -- Задержка между телепортациями к разным NPC (в секундах)
 
 -- ==================== СПИСКИ NPC ====================
 -- NPC, которых не нужно убивать
 local doNotKillList = {
-	
+	["Necromancer"] = true,
+	["TrollgeKing"] = true,
+	["BUFFNeckTrollge"] = true,
 }
 
 -- Особые NPC (желтая подсветка)
 local specialNPCs = {
-
+	["Elf Traveler"] = true,
 }
 
 -- ==================== СПИСОК ИГНОРА ====================
 local ignoreList = {
-	["Hivemind Halogram"] = true,
+	["Hivemind Hologram"] = true,
 	["DEADFace"] = true,
+	["ULTRAOPAMOGUS"] = true,
 	["Derp"] = true,
+	["Le true venus:2"] = true,
 	["Arena Knight"] = true,
+	["Grand Knight"] = true,
 	["Knight"] = true,
 	["Mystery"] = true,
-	["Necromancer"] = true,
 	["Shopkeeper"] = true,
+	["Trollge"] = true,
 }
 
 -- ==================== ТАБЛИЦЫ ОТСЛЕЖИВАНИЯ ====================
