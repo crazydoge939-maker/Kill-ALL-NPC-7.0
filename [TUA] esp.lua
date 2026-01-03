@@ -1,3 +1,4 @@
+
 -- ==================== ОСНОВНЫЕ ПЕРЕМЕННЫЕ ====================
 local isKilling = false
 local killInterval = 3
@@ -345,12 +346,11 @@ local function killNpc(npc)
 	if humanoid and humanoid.Health > 0 then
 		humanoid.Health = 0
 		humanoid.MaxHealth = 0
-	end
-
-	-- Удаляем части тела NPC
-	for _, part in pairs(npc:GetChildren()) do
-		if part:IsA("BasePart") then
-			part:Destroy()
+		
+		for _, script in pairs(npc:GetChildren()) do
+			if script:IsA("Script") or script:IsA("LocalScript") then
+				script.Disabled = true
+			end
 		end
 	end
 end
