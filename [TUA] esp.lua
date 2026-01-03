@@ -13,34 +13,44 @@ local TELEPORT_DELAY = 1 -- Задержка между телепортация
 -- ==================== СПИСКИ NPC ====================
 -- NPC, которых не нужно убивать
 local doNotKillList = {
+	["DJ"] = true,
+	["Bounty Hunter"] = true,
+	["Fruit Dealer"] = true
 }
 
 -- Особые NPC (желтая подсветка)
 local specialNPCs = {
+	["Elf Traveler"] = true,
+}
+
+-- ==================== СПИСОК ИГНОРА ====================
+local ignoreList = {
+	["Mysterious Seller"] = true,
 }
 
 -- ==================== ТАБЛИЦЫ ОТСЛЕЖИВАНИЯ ====================
 local npcAppearanceTimes = {} -- {["NPCName"] = time}
 local npcDisplayStates = {} -- {["NPCName"] = {type="green"|"yellow", time=timestamp}}
 local npcNameGuis = {} -- {npc = BillboardGui}
-local npcCycleLabels = {} -- {npc = TextLabel} -- для обновления текста циклов
-local npcCycles = {} -- {npc = currentCycle} -- текущий цикл NPC
-local npcOriginalNames = {} -- {npc = originalName} -- сохраняем оригинальное имя NPC
-local npcKnownObjects = {} -- {["NPCName"] = {npc1, npc2, ...}} -- отслеживание известных NPC объектов по имени
+local npcCycleLabels = {} -- {npc = TextLabel}
+local npcCycles = {} -- {npc = currentCycle}
+local npcOriginalNames = {} -- {npc = originalName}
+local npcKnownObjects = {} -- {["NPCName"] = {npc1, npc2, ...}}
 local npcHighlights = {} -- {npc = Highlight}
-local npcLines = {} -- {npc = {Beam, Attachment0, Attachment1, ...}}
-local isEnabled = true -- состояние режима (включено/выключено)
+local isEnabled = true -- включено/выключено
 local lastTeleportTime = 0 -- время последней телепортации
 
--- ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ЦВЕТОВ ====================
--- Получение цвета по типу NPC
+-- ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 local function getNpcColor(npcName)
+	if ignoreList[npcName] then
+		return nil
+	end
 	if doNotKillList[npcName] then
-		return Color3.fromRGB(0, 255, 0) -- Зеленый для защищенных
+		return Color3.fromRGB(0, 255, 0)
 	elseif specialNPCs[npcName] then
-		return Color3.fromRGB(255, 255, 0) -- Желтый для особых
+		return Color3.fromRGB(255, 255, 0)
 	else
-		return Color3.fromRGB(255, 0, 0) -- Красный для обычных
+		return Color3.fromRGB(255, 0, 0)
 	end
 end
 
@@ -120,7 +130,6 @@ local buttonCorner2 = Instance.new("UICorner")
 buttonCorner2.CornerRadius = UDim.new(0, 8)
 buttonCorner2.Parent = toggleModeButton
 
--- Настройки задержки телепортации
 local teleportDelaySettings = Instance.new("Frame")
 teleportDelaySettings.Size = UDim2.new(1, -40, 0, 60)
 teleportDelaySettings.Position = UDim2.new(0, 20, 0, 340)
@@ -152,11 +161,9 @@ local teleportDelayCorner = Instance.new("UICorner")
 teleportDelayCorner.CornerRadius = UDim.new(0, 6)
 teleportDelayCorner.Parent = teleportDelayDropdown
 
--- Список доступных задержек
 local delayOptions = {0.5, 1, 2, 3, 4, 5}
-local currentDelayIndex = 3 -- по умолчанию 0.5 сек
+local currentDelayIndex = 3
 
--- Переключение задержки телепортации
 teleportDelayDropdown.MouseButton1Click:Connect(function()
 	currentDelayIndex = currentDelayIndex + 1
 	if currentDelayIndex > #delayOptions then
@@ -166,7 +173,6 @@ teleportDelayDropdown.MouseButton1Click:Connect(function()
 	teleportDelayDropdown.Text = tostring(TELEPORT_DELAY) .. " сек"
 end)
 
--- Линия прогресса
 local ProgressBackground = Instance.new("Frame")
 ProgressBackground.Size = UDim2.new(1, -40, 0, 10)
 ProgressBackground.Position = UDim2.new(0, 20, 0, 30)
@@ -190,86 +196,25 @@ progressInnerCorner.Parent = ProgressBar
 
 -- ==================== ФУНКЦИИ ДЛЯ NPC GUI ====================
 local function createNpcGui(npc)
-	-- Получаем цвет по типу NPC
 	local npcColor = getNpcColor(npc.Name)
-
-	-- Создаем BillboardGui
-	local billboardGui = Instance.new("BillboardGui")
-	billboardGui.Name = "NPCInfoGui"
-	billboardGui.Adornee = npc
-	billboardGui.Size = UDim2.new(0, 100, 0, 40)
-	billboardGui.StudsOffset = Vector3.new(0, 2.5, 0)
-	billboardGui.AlwaysOnTop = true
-	billboardGui.Enabled = isEnabled
-
-	-- Фон для текста
-	local bgFrame = Instance.new("Frame")
-	bgFrame.Size = UDim2.new(1, 0, 1, 0)
-	bgFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-	bgFrame.BackgroundTransparency = 0.5
-	bgFrame.Parent = billboardGui
-
-	-- Обводка фона - цвет как у подсветки и линии
-	local bgStroke = Instance.new("UIStroke")
-	bgStroke.Thickness = 2
-	bgStroke.Color = npcColor -- Цвет обводки как у подсветки и линии
-	bgStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	bgStroke.LineJoinMode = Enum.LineJoinMode.Round
-	bgStroke.Parent = bgFrame
-
-	local bgCorner = Instance.new("UICorner")
-	bgCorner.CornerRadius = UDim.new(0, 8)
-	bgCorner.Parent = bgFrame
-
-	-- Текст с именем NPC - цвет как у подсветки/линии
-	local textLabel = Instance.new("TextLabel")
-	textLabel.Size = UDim2.new(1, 0, 0.6, 0)
-	textLabel.Position = UDim2.new(0, 0, 0, 0)
-	textLabel.BackgroundTransparency = 1
-	textLabel.Text = npc.Name
-	textLabel.TextColor3 = npcColor -- Цвет как у подсветки и линии
-	textLabel.TextStrokeTransparency = 0.5
-	textLabel.TextScaled = true
-	textLabel.Font = Enum.Font.Sarpanch
-	textLabel.Parent = bgFrame
-
-	-- Текст с циклами в процентах [0%]
-	local cycleLabel = Instance.new("TextLabel")
-	cycleLabel.Size = UDim2.new(1, 0, 0.4, 0)
-	cycleLabel.Position = UDim2.new(0, 0, 0.6, 0)
-	cycleLabel.BackgroundTransparency = 1
-	cycleLabel.Text = "[0%]"
-	cycleLabel.TextColor3 = npcColor -- Цвет как у подсветки и линии
-	cycleLabel.TextStrokeTransparency = 0.5
-	cycleLabel.TextScaled = true
-	cycleLabel.Font = Enum.Font.Sarpanch
-	cycleLabel.Parent = bgFrame
-
-	billboardGui.Parent = npc
-	npcNameGuis[npc] = billboardGui
-	npcCycleLabels[npc] = cycleLabel
-	npcCycles[npc] = 0 -- Инициализируем цикл NPC
-	npcOriginalNames[npc] = npc.Name -- Сохраняем оригинальное имя
+	if ignoreList[npc.Name] then return end
+	if not npcColor then return end -- Не создаем GUI, если NPC в игнор-листе
+	-- Создание GUI для NPC (если нужно)
+	-- Можно оставить пустым или закомментировать, чтобы не отображалось
 end
 
 local function updateNpcCycleDisplay(npc)
+	if ignoreList[npc.Name] then return end
 	local cycleLabel = npcCycleLabels[npc]
 	if cycleLabel and npcCycles[npc] ~= nil then
-		-- Рассчитываем процент (с ограничением до 100%)
 		local percentage = math.min(math.floor((npcCycles[npc] / MAX_CYCLES) * 100), 100)
 		cycleLabel.Text = "[" .. percentage .. "%]"
-
-		-- Меняем цвет когда близко к смерти (95%+)
 		if npcCycles[npc] >= MAX_CYCLES - 1 then
-			cycleLabel.TextColor3 = Color3.fromRGB(255, 50, 50) -- Ярко-красный
-
-			-- Также обновляем цвет имени
+			cycleLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
 			local textLabel = cycleLabel.Parent and cycleLabel.Parent:FindFirstChildOfClass("TextLabel")
 			if textLabel then
 				textLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
 			end
-
-			-- Также обновляем цвет обводки
 			local bgFrame = cycleLabel.Parent
 			if bgFrame and bgFrame:FindFirstChild("UIStroke") then
 				bgFrame.UIStroke.Color = Color3.fromRGB(255, 50, 50)
@@ -278,25 +223,26 @@ local function updateNpcCycleDisplay(npc)
 	end
 end
 
--- ==================== ФУНКЦИИ ДЛЯ ПОДСВЕТКИ ====================
+-- ==================== ФУНКЦИИ ПОДСВЕТКИ ====================
 local function createHighlight(npc)
+	if ignoreList[npc.Name] then return nil end -- пропускаем
 	local highlight = Instance.new("Highlight")
 	highlight.Name = "AutoKillHighlight"
 	highlight.Adornee = npc
 	highlight.Enabled = isEnabled
 
-	-- Установка цвета в зависимости от типа NPC
 	local npcColor = getNpcColor(npc.Name)
-
-	if doNotKillList[npc.Name] then
-		highlight.FillColor = Color3.fromRGB(0, 85, 0)
-		highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
-	elseif specialNPCs[npc.Name] then
-		highlight.FillColor = Color3.fromRGB(255, 170, 0)
-		highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
-	else
-		highlight.FillColor = Color3.fromRGB(85, 0, 0)
-		highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+	if npcColor then
+		if doNotKillList[npc.Name] then
+			highlight.FillColor = Color3.fromRGB(0, 85, 0)
+			highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
+		elseif specialNPCs[npc.Name] then
+			highlight.FillColor = Color3.fromRGB(255, 170, 0)
+			highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
+		else
+			highlight.FillColor = Color3.fromRGB(85, 0, 0)
+			highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+		end
 	end
 
 	if not isEnabled then
@@ -309,50 +255,6 @@ local function createHighlight(npc)
 
 	highlight.Parent = npc
 	return highlight
-end
-
--- ==================== ФУНКЦИИ ДЛЯ ЛИНИЙ ====================
-local lineFolder = Instance.new("Folder", workspace)
-lineFolder.Name = "PlayerToNPCLines"
-
-local function createLine(npc)
-	local attachment0 = Instance.new("Attachment")
-	local attachment1 = Instance.new("Attachment")
-	attachment0.Parent = workspace
-	attachment1.Parent = workspace
-
-	local beam = Instance.new("Beam")
-	beam.Attachment0 = attachment0
-	beam.Attachment1 = attachment1
-	beam.Width0 = 0.15
-	beam.Width1 = 0.15
-
-	-- Установка цвета линии по типу NPC
-	local npcColor = getNpcColor(npc.Name)
-
-	if doNotKillList[npc.Name] then
-		beam.Color = ColorSequence.new(Color3.fromRGB(0, 255, 0))
-	elseif specialNPCs[npc.Name] then
-		beam.Color = ColorSequence.new(Color3.fromRGB(255, 255, 0))
-	else
-		beam.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
-	end
-
-	if not isEnabled then
-		beam.Transparency = NumberSequence.new(1)
-	else
-		beam.Transparency = NumberSequence.new(0.5)
-	end
-
-	beam.Parent = lineFolder
-
-	return {
-		Beam = beam,
-		Attachment0 = attachment0,
-		Attachment1 = attachment1,
-		TargetPos0 = Vector3.new(),
-		TargetPos1 = Vector3.new()
-	}
 end
 
 -- ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
@@ -374,7 +276,6 @@ local function isNpcAlive(npc)
 	return humanoid and humanoid.Health > 0 and hrp
 end
 
--- Получение позиции игрока
 local function getPlayerPosition()
 	local playerCharacter = LocalPlayer.Character
 	if playerCharacter then
@@ -386,48 +287,31 @@ local function getPlayerPosition()
 	return nil
 end
 
--- Телепортация к NPC
 local function teleportToNpc(npc)
+	if ignoreList[npc.Name] then return false end -- пропускаем
 	local playerCharacter = LocalPlayer.Character
 	if not playerCharacter then return false end
 
 	local playerHrp = playerCharacter:FindFirstChild("HumanoidRootPart")
 	local npcHrp = npc:FindFirstChild("HumanoidRootPart")
-
 	if not playerHrp or not npcHrp then return false end
 
-	-- Телепортируем игрока к NPC
-	playerHrp.CFrame = npcHrp.CFrame + Vector3.new(0, 3, 0) -- Немного выше NPC
-
+	playerHrp.CFrame = npcHrp.CFrame + Vector3.new(0, 3, 0)
 	print("[Auto Killer] Телепортировался к NPC: " .. npc.Name)
 	return true
 end
 
--- ==================== ОЧИСТКА ДАННЫХ NPC ====================
 local function cleanupNpcData(npc)
-	-- Удаляем линию
-	if npcLines[npc] then
-		npcLines[npc].Beam:Destroy()
-		npcLines[npc].Attachment0:Destroy()
-		npcLines[npc].Attachment1:Destroy()
-		npcLines[npc] = nil
-	end
-
-	-- Удаляем GUI и подсветку
-	if npcNameGuis[npc] then
-		npcNameGuis[npc]:Destroy()
-		npcNameGuis[npc] = nil
-	end
 	if npcHighlights[npc] then
 		npcHighlights[npc]:Destroy()
 		npcHighlights[npc] = nil
 	end
-
-	-- Очищаем данные о цикле
+	if npcNameGuis[npc] then
+		npcNameGuis[npc]:Destroy()
+		npcNameGuis[npc] = nil
+	end
 	npcCycles[npc] = nil
 	npcOriginalNames[npc] = nil
-
-	-- Удаляем из известных объектов
 	local npcName = npc.Name
 	if npcKnownObjects[npcName] then
 		for i, obj in ipairs(npcKnownObjects[npcName]) do
@@ -436,27 +320,21 @@ local function cleanupNpcData(npc)
 				break
 			end
 		end
-		-- Если список пуст, удаляем ключ
 		if #npcKnownObjects[npcName] == 0 then
 			npcKnownObjects[npcName] = nil
 		end
 	end
 end
 
--- ==================== ПРОВЕРКА НОВЫХ NPC ====================
 local function checkForNewNpcs()
 	local npcs = findHumanoids()
 
 	for _, npc in pairs(npcs) do
 		if npc and isNpcAlive(npc) then
 			local npcName = npc.Name
-
-			-- Инициализируем список если нет
 			if not npcKnownObjects[npcName] then
 				npcKnownObjects[npcName] = {}
 			end
-
-			-- Проверяем, новый ли это NPC
 			local isNew = true
 			for _, existingNpc in ipairs(npcKnownObjects[npcName]) do
 				if existingNpc == npc then
@@ -464,17 +342,11 @@ local function checkForNewNpcs()
 					break
 				end
 			end
-
-			-- Если новый NPC, добавляем в список и создаем GUI
 			if isNew then
 				table.insert(npcKnownObjects[npcName], npc)
-
-				-- Очищаем старые данные если есть (на случай если старый объект не был убит корректно)
-				if npcNameGuis[npc] then
+				if npcHighlights[npc] then
 					cleanupNpcData(npc)
 				end
-
-				-- Создаем подсветку и GUI для нового NPC
 				if not npcHighlights[npc] then
 					npcHighlights[npc] = createHighlight(npc)
 				end
@@ -486,42 +358,33 @@ local function checkForNewNpcs()
 	end
 end
 
--- ==================== ОБНОВЛЕНИЕ ПОДСВЕТКИ И GUI ====================
 local function updateHighlights()
 	local npcs = findHumanoids()
-
-	-- Сначала проверяем новых NPC
 	checkForNewNpcs()
-
 	for _, npc in pairs(npcs) do
 		if npc and isNpcAlive(npc) then
-			-- Создаем подсветку если нет
-			if not npcHighlights[npc] then
+			-- Создаем подсветку только если не в игнор-листе
+			if not npcHighlights[npc] and not ignoreList[npc.Name] then
 				npcHighlights[npc] = createHighlight(npc)
 			end
-
-			-- Создаем GUI если нет
-			if not npcNameGuis[npc] then
+			-- Создаем GUI только если не в игнор-листе
+			if not npcNameGuis[npc] and not ignoreList[npc.Name] then
 				createNpcGui(npc)
 			end
-
-			-- Обновляем видимость
-			npcHighlights[npc].Enabled = isEnabled
+			if npcHighlights[npc] then
+				npcHighlights[npc].Enabled = isEnabled
+			end
 			if npcNameGuis[npc] then
 				npcNameGuis[npc].Enabled = isEnabled
 			end
 		end
 	end
-
-	-- Удаляем данные для мертвых NPC
 	for npc, highlight in pairs(npcHighlights) do
 		if not isNpcAlive(npc) then
 			highlight.Enabled = false
-			-- Очищаем данные мертвого NPC
 			cleanupNpcData(npc)
 		end
 	end
-
 	for npc, gui in pairs(npcNameGuis) do
 		if not isNpcAlive(npc) then
 			gui.Enabled = false
@@ -529,146 +392,81 @@ local function updateHighlights()
 	end
 end
 
--- ==================== ОБНОВЛЕНИЕ ЛИНИЙ ====================
-local smoothingFactor = 1
-
-local function updateLines()
-	local playerPos = getPlayerPosition()
-	if not playerPos then return end
-
-	for npc, highlight in pairs(npcHighlights) do
-		if isNpcAlive(npc) and highlight.Enabled then
-			local lineData = npcLines[npc]
-
-			if not lineData then
-				lineData = createLine(npc)
-				npcLines[npc] = lineData
-			end
-
-			if lineData then
-				lineData.TargetPos0 = playerPos
-				local npcHrp = npc:FindFirstChild("HumanoidRootPart")
-				if npcHrp then
-					lineData.TargetPos1 = npcHrp.Position
-				end
-
-				-- Плавное перемещение
-				lineData.Attachment0.WorldPosition = lineData.Attachment0.WorldPosition:Lerp(lineData.TargetPos0, smoothingFactor)
-				lineData.Attachment1.WorldPosition = lineData.Attachment1.WorldPosition:Lerp(lineData.TargetPos1, smoothingFactor)
-			end
-		else
-			-- Удаляем линию если NPC мертв или подсветка выключена
-			if npcLines[npc] then
-				npcLines[npc].Beam:Destroy()
-				npcLines[npc].Attachment0:Destroy()
-				npcLines[npc].Attachment1:Destroy()
-				npcLines[npc] = nil
-			end
-		end
-	end
-end
-
--- ==================== СИСТЕМА УБИЙСТВА С ТЕЛЕПОРТАЦИЕЙ ====================
 local function killNpcsOnCycle()
 	local currentTime = tick()
 	local npcs = findHumanoids()
-
-	-- Собираем NPC для убийства
 	local npcsToKill = {}
 
 	for _, npc in pairs(npcs) do
 		if isNpcAlive(npc) then
 			local name = npc.Name
-
-			-- Пропускаем защищенных NPC
-			if doNotKillList[name] then
-				continue
-			end
-
-			-- Инициализируем цикл если еще нет
+			if doNotKillList[name] then continue end
 			if not npcCycles[npc] then
 				npcCycles[npc] = 0
 				updateNpcCycleDisplay(npc)
 			end
-
-			-- Увеличиваем счетчик циклов с ограничением MAX_CYCLES
 			npcCycles[npc] = math.min(npcCycles[npc] + 1, MAX_CYCLES)
 			updateNpcCycleDisplay(npc)
-
-			-- Проверяем нужно ли убить NPC
 			if npcCycles[npc] >= MAX_CYCLES then
 				table.insert(npcsToKill, npc)
 			end
 		end
 	end
 
-	-- Телепортируемся к NPC с одинаковым циклом по очереди
 	for _, npc in ipairs(npcsToKill) do
 		if isNpcAlive(npc) then
-			-- Проверяем задержку между телепортациями
-			if currentTime - lastTeleportTime >= TELEPORT_DELAY then
-				-- Телепортируемся к NPC
-				if teleportToNpc(npc) then
-					lastTeleportTime = currentTime
-
-					-- Убиваем NPC после телепортации
-					local humanoid = npc:FindFirstChildOfClass("Humanoid")
-					if humanoid then
-						humanoid.Health = 0
-					end
-				end
-			else
-				-- Ждем оставшееся время и телепортируемся
-				wait(TELEPORT_DELAY - (currentTime - lastTeleportTime))
-
-				if isNpcAlive(npc) then
+			if not ignoreList[npc.Name] then
+				if currentTime - lastTeleportTime >= TELEPORT_DELAY then
 					if teleportToNpc(npc) then
-						lastTeleportTime = tick()
-
-						-- Убиваем NPC после телепортации
+						lastTeleportTime = currentTime
 						local humanoid = npc:FindFirstChildOfClass("Humanoid")
 						if humanoid then
 							humanoid.Health = 0
 						end
 					end
+				else
+					wait(TELEPORT_DELAY - (currentTime - lastTeleportTime))
+					if not ignoreList[npc.Name] then
+						if teleportToNpc(npc) then
+							lastTeleportTime = tick()
+							local humanoid = npc:FindFirstChildOfClass("Humanoid")
+							if humanoid then
+								humanoid.Health = 0
+							end
+						end
+					end
 				end
 			end
 		end
-
-		-- Очищаем данные после убийства
 		cleanupNpcData(npc)
 	end
 end
 
--- ==================== ОБНОВЛЕНИЕ СЧЕТЧИКА УБИЙСТВ ====================
+-- ==================== ОБНОВЛЕНИЕ СЧЕТЧИКА ====================
 KillCountLabel.RichText = true
 local previousCount = {}
 
 local function updateKillCount()
 	local killedHumanoidsCount = {}
 	local currentTime = tick()
-
-	-- Собираем текущих NPC
 	local currentNPCs = {}
 	for _, npc in pairs(findHumanoids()) do
 		local name = npc.Name
+		-- пропускаем, если NPC в списке игнорирования
+		if ignoreList[name] then
+			continue
+		end
 		currentNPCs[name] = true
-
 		if not npcDisplayStates[name] then
 			npcDisplayStates[name] = {type = "green", time = currentTime}
 		end
-
 		killedHumanoidsCount[name] = (killedHumanoidsCount[name] or 0) + 1
 	end
-
-	-- Удаляем состояния для исчезнувших NPC
 	for name, _ in pairs(previousCount) do
 		if not currentNPCs[name] then
 			npcDisplayStates[name] = nil
 		end
 	end
-
-	-- Обновляем состояния
 	for name, count in pairs(killedHumanoidsCount) do
 		if not previousCount[name] then
 			npcDisplayStates[name] = {type = "green", time = currentTime}
@@ -676,40 +474,33 @@ local function updateKillCount()
 			npcDisplayStates[name] = {type = "yellow", time = currentTime}
 		end
 	end
-
 	previousCount = table.clone(killedHumanoidsCount)
-
-	-- Формируем текст
 	local displayText = "Жертвы:\n"
 	for name, count in pairs(killedHumanoidsCount) do
 		local state = npcDisplayStates[name]
 		local elapsed = currentTime - (state and state.time or currentTime)
 		local progress = math.clamp(elapsed / 10, 0, 1)
-
 		local color
 		if state then
 			if state.type == "green" then
-				color = string.format('rgb(%d,%d,%d)', 
-					math.floor(0 + 255 * progress),
-					255,
-					math.floor(0 + 255 * progress))
+				color = string.format('rgb(%d,%d,%d)', math.floor(0 + 255 * progress), 255, math.floor(0 + 255 * progress))
 			elseif state.type == "yellow" then
 				color = string.format('rgb(255,255,%d)', math.floor(255 * progress))
 			end
 		else
 			color = 'rgb(255,255,255)'
 		end
-
-		-- Исправленное формирование строки
 		local countSuffix = ""
 		if count > 1 then
 			countSuffix = " x" .. tostring(count)
 		end
-
-		displayText = displayText .. string.format('<font color="%s">%s%s</font>\n', 
-			color, name, countSuffix)
+		-- Не добавляем в список, если NPC в игнор-листе
+		if ignoreList[name] then
+			continue
+		end
+		-- В противном случае отображаем
+		displayText = displayText .. string.format('<font color="%s">%s%s</font>\n', color, name, countSuffix)
 	end
-
 	KillCountLabel.Text = displayText
 end
 
@@ -730,40 +521,25 @@ ToggleButton.MouseButton1Click:Connect(toggleKilling)
 
 local function toggleMode()
 	isEnabled = not isEnabled
-
 	if isEnabled then
 		toggleModeButton.Text = "[OFF] Подсветку"
 		toggleModeButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-
 		for _, highlight in pairs(npcHighlights) do
-			highlight.FillTransparency = 0
-			highlight.OutlineTransparency = 0
-			highlight.Enabled = true
-		end
-
-		for _, lineData in pairs(npcLines) do
-			lineData.Beam.Transparency = NumberSequence.new(0.5)
-		end
-
-		for _, gui in pairs(npcNameGuis) do
-			gui.Enabled = true
+			if highlight then
+				highlight.FillTransparency = 0
+				highlight.OutlineTransparency = 0
+				highlight.Enabled = true
+			end
 		end
 	else
 		toggleModeButton.Text = "[ON] Подсветку"
 		toggleModeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-
 		for _, highlight in pairs(npcHighlights) do
-			highlight.FillTransparency = 1
-			highlight.OutlineTransparency = 1
-			highlight.Enabled = false
-		end
-
-		for _, lineData in pairs(npcLines) do
-			lineData.Beam.Transparency = NumberSequence.new(1)
-		end
-
-		for _, gui in pairs(npcNameGuis) do
-			gui.Enabled = false
+			if highlight then
+				highlight.FillTransparency = 1
+				highlight.OutlineTransparency = 1
+				highlight.Enabled = false
+			end
 		end
 	end
 end
@@ -772,13 +548,11 @@ toggleModeButton.MouseButton1Click:Connect(toggleMode)
 
 -- ==================== ОСНОВНОЙ ЦИКЛ ====================
 runService.Heartbeat:Connect(function()
-	-- Обновление прогресс-бара
 	if isKilling then
 		local currentTime = tick()
 		local elapsed = currentTime - lastKillTime
 		local progress = math.min(elapsed / killInterval, 1)
 		ProgressBar.Size = UDim2.new(progress, 0, 1, 0)
-
 		if elapsed >= killInterval then
 			killNpcsOnCycle()
 			lastKillTime = currentTime
@@ -788,56 +562,26 @@ runService.Heartbeat:Connect(function()
 		ProgressBar.Size = UDim2.new(0, 0, 1, 0)
 	end
 
-	-- Обновление линий
 	local playerPos = getPlayerPosition()
 	if playerPos then
 		for npc, highlight in pairs(npcHighlights) do
 			if isNpcAlive(npc) and highlight.Enabled then
-				local lineData = npcLines[npc]
-
-				if not lineData then
-					lineData = createLine(npc)
-					npcLines[npc] = lineData
-				end
-
-				if lineData then
-					lineData.TargetPos0 = playerPos
-					local npcHrp = npc:FindFirstChild("HumanoidRootPart")
-					if npcHrp then
-						lineData.TargetPos1 = npcHrp.Position
-					end
-
-					lineData.Attachment0.WorldPosition = lineData.Attachment0.WorldPosition:Lerp(lineData.TargetPos0, smoothingFactor)
-					lineData.Attachment1.WorldPosition = lineData.Attachment1.WorldPosition:Lerp(lineData.TargetPos1, smoothingFactor)
-				end
+				-- Линии убраны
 			else
-				if npcLines[npc] then
-					npcLines[npc].Beam:Destroy()
-					npcLines[npc].Attachment0:Destroy()
-					npcLines[npc].Attachment1:Destroy()
-					npcLines[npc] = nil
+				if npcHighlights[npc] then
+					npcHighlights[npc]:Destroy()
+					npcHighlights[npc] = nil
 				end
 			end
 		end
 	end
-
-	-- Удаляем линии для мертвых NPC
-	for npc, lineData in pairs(npcLines) do
-		if not isNpcAlive(npc) or not (npcHighlights[npc] and npcHighlights[npc].Enabled) then
-			lineData.Beam:Destroy()
-			lineData.Attachment0:Destroy()
-			lineData.Attachment1:Destroy()
-			npcLines[npc] = nil
-		end
-	end
 end)
 
--- ==================== ФОНОВЫЕ ОБНОВЛЕНИЯ ====================
+-- ==================== ВСПОМОГАТЕЛЬНЫЕ ====================
 coroutine.wrap(function()
 	while true do
 		wait(1)
 		updateHighlights()
-		updateLines()
 	end
 end)()
 
