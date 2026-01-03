@@ -345,6 +345,7 @@ local function killNpc(npc)
 	if humanoid and humanoid.Health > 0 then
 		humanoid.Health = 0
 		humanoid.MaxHealth = 0
+		npc:Destroy()
 	end
 end
 
