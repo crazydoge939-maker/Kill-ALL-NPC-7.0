@@ -8,14 +8,12 @@ local LocalPlayer = Players.LocalPlayer
 
 -- ==================== НАСТРОЙКИ ====================
 local MAX_CYCLES = 0 -- Сколько циклов NPC должен выжить перед смертью
-local TELEPORT_DELAY = 1 -- Задержка между телепортациями к разным NPC (в секундах)
+local TELEPORT_DELAY = 999999999999 -- Задержка между телепортациями к разным NPC (в секундах)
 
 -- ==================== СПИСКИ NPC ====================
 -- NPC, которых не нужно убивать
 local doNotKillList = {
 	["Necromancer"] = true,
-	["TrollgeKing"] = true,
-	["BUFFNeckTrollge"] = true,
 }
 
 -- Особые NPC (желтая подсветка)
@@ -28,10 +26,12 @@ local ignoreList = {
 	["Hivemind Hologram"] = true,
 	["DEADFace"] = true,
 	["ULTRAOPAMOGUS"] = true,
+	["TrollgeKing"] = true,
 	["Derp"] = true,
 	["Le true venus:2"] = true,
 	["Arena Knight"] = true,
 	["Grand Knight"] = true,
+	["BUFFNeckTrollge"] = true,
 	["Knight"] = true,
 	["Mystery"] = true,
 	["Shopkeeper"] = true,
@@ -411,18 +411,26 @@ local function killNpcsOnCycle()
 		if isNpcAlive(npc) then
 			local name = npc.Name
 			if doNotKillList[name] then continue end
-			if not npcCycles[npc] then
-				npcCycles[npc] = 0
+
+			-- Проверка, что NPC жив, и если не — его убить
+			local humanoid = npc:FindFirstChildOfClass("Humanoid")
+			if humanoid and humanoid.Health > 0 then
+				-- Увеличиваем счетчик циклов
+				if not npcCycles[npc] then
+					npcCycles[npc] = 0
+				end
+				npcCycles[npc] = math.min(npcCycles[npc] + 1, MAX_CYCLES)
 				updateNpcCycleDisplay(npc)
-			end
-			npcCycles[npc] = math.min(npcCycles[npc] + 1, MAX_CYCLES)
-			updateNpcCycleDisplay(npc)
-			if npcCycles[npc] >= MAX_CYCLES then
-				table.insert(npcsToKill, npc)
+
+				-- Если достигли максимума циклов, убиваем
+				if npcCycles[npc] >= MAX_CYCLES then
+					table.insert(npcsToKill, npc)
+				end
 			end
 		end
 	end
 
+	-- Убиваем NPC
 	for _, npc in ipairs(npcsToKill) do
 		if isNpcAlive(npc) then
 			if not ignoreList[npc.Name] then
@@ -430,7 +438,7 @@ local function killNpcsOnCycle()
 					if teleportToNpc(npc) then
 						lastTeleportTime = currentTime
 						local humanoid = npc:FindFirstChildOfClass("Humanoid")
-						if humanoid then
+						if humanoid and humanoid.Health > 0 then
 							humanoid.Health = 0
 						end
 					end
@@ -440,7 +448,7 @@ local function killNpcsOnCycle()
 						if teleportToNpc(npc) then
 							lastTeleportTime = tick()
 							local humanoid = npc:FindFirstChildOfClass("Humanoid")
-							if humanoid then
+							if humanoid and humanoid.Health > 0 then
 								humanoid.Health = 0
 							end
 						end
@@ -448,6 +456,7 @@ local function killNpcsOnCycle()
 				end
 			end
 		end
+		-- Очистка данных NPC
 		cleanupNpcData(npc)
 	end
 end
