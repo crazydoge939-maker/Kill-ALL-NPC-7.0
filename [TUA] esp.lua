@@ -1,3 +1,4 @@
+
 -- ==================== ОСНОВНЫЕ ПЕРЕМЕННЫЕ ====================
 local isKilling = false
 local killInterval = 3
@@ -343,9 +344,15 @@ local function killNpc(npc)
 	if not isNpcAlive(npc) then return end
 	local humanoid = npc:FindFirstChildOfClass("Humanoid")
 	if humanoid and humanoid.Health > 0 then
+		-- Меняем название части HumanoidRootPart на Death
+		local rootPart = npc:FindFirstChild("HumanoidRootPart")
+		if rootPart then
+			rootPart.Name = "Death"
+		end
+
+		-- Убиваем NPC
 		humanoid.Health = 0
 		humanoid.MaxHealth = 0
-		npc:Destroy()
 	end
 end
 
