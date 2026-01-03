@@ -1,3 +1,4 @@
+
 -- ==================== ОСНОВНЫЕ ПЕРЕМЕННЫЕ ====================
 local isKilling = false
 local killInterval = 3
@@ -339,6 +340,35 @@ local function cleanupNpcData(npc)
 	end
 end
 
+local function killNpc(npc)
+	if not isNpcAlive(npc) then return end
+	local humanoid = npc:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.Health > 0 then
+		humanoid.Health = 0
+	end
+end
+
+local function onNpcTouched(npc, otherPart)
+	if not otherPart then return end
+	local character = otherPart.Parent
+	if character and character:FindFirstChildOfClass("Humanoid") and character.Parent == LocalPlayer.Character then
+		if isNpcAlive(npc) and not doNotKillList[npc.Name] and not ignoreList[npc.Name] then
+			killNpc(npc)
+			print("[Auto Killer] NPC убит при касании: " .. npc.Name)
+		end
+	end
+end
+
+local function connectTouchedEvent(npc)
+	local hrp = npc:FindFirstChild("HumanoidRootPart")
+	if hrp and not hrp:GetAttribute("TouchedConnected") then
+		hrp:GetAttribute("TouchedConnected", true)
+		hrp.Touched:Connect(function(otherPart)
+			onNpcTouched(npc, otherPart)
+		end)
+	end
+end
+
 local function checkForNewNpcs()
 	local npcs = findHumanoids()
 
@@ -366,6 +396,8 @@ local function checkForNewNpcs()
 				if not npcNameGuis[npc] then
 					createNpcGui(npc)
 				end
+				-- подключаем касание
+				connectTouchedEvent(npc)
 			end
 		end
 	end
@@ -402,14 +434,6 @@ local function updateHighlights()
 		if not isNpcAlive(npc) then
 			gui.Enabled = false
 		end
-	end
-end
-
-local function killNpc(npc)
-	if not isNpcAlive(npc) then return end
-	local humanoid = npc:FindFirstChildOfClass("Humanoid")
-	if humanoid and humanoid.Health > 0 then
-		humanoid.Health = 0
 	end
 end
 
