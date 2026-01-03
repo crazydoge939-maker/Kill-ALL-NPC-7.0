@@ -1,4 +1,3 @@
-
 -- ==================== ОСНОВНЫЕ ПЕРЕМЕННЫЕ ====================
 local isKilling = false
 local killInterval = 3
@@ -343,15 +342,13 @@ end
 local function killNpc(npc)
 	if not isNpcAlive(npc) then return end
 	local humanoid = npc:FindFirstChildOfClass("Humanoid")
-	if humanoid and humanoid.Health > 0 then
+	local hrp = npc:FindFirstChild("HumanoidRootPart")
+	if humanoid then
 		humanoid.Health = 0
 		humanoid.MaxHealth = 0
-		
-		for _, script in pairs(npc:GetChildren()) do
-			if script:IsA("Script") or script:IsA("LocalScript") then
-				script.Disabled = true
-			end
-		end
+	end
+	if hrp then
+		hrp:BreakJoints()
 	end
 end
 
