@@ -13,19 +13,24 @@ local TELEPORT_DELAY = 1 -- Задержка между телепортация
 -- ==================== СПИСКИ NPC ====================
 -- NPC, которых не нужно убивать
 local doNotKillList = {
-	["DJ"] = true,
-	["Bounty Hunter"] = true,
-	["Fruit Dealer"] = true
+	
 }
 
 -- Особые NPC (желтая подсветка)
 local specialNPCs = {
-	["Elf Traveler"] = true,
+
 }
 
 -- ==================== СПИСОК ИГНОРА ====================
 local ignoreList = {
-	["Mysterious Seller"] = true,
+	["Hivemind Halogram"] = true,
+	["DEADFace"] = true,
+	["Derp"] = true,
+	["Arena Knight"] = true,
+	["Knight"] = true,
+	["Mystery"] = true,
+	["Necromancer"] = true,
+	["Shopkeeper"] = true,
 }
 
 -- ==================== ТАБЛИЦЫ ОТСЛЕЖИВАНИЯ ====================
