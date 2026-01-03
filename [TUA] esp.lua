@@ -1,4 +1,3 @@
-
 -- ==================== ОСНОВНЫЕ ПЕРЕМЕННЫЕ ====================
 local isKilling = false
 local killInterval = 3
@@ -345,6 +344,7 @@ local function killNpc(npc)
 	local humanoid = npc:FindFirstChildOfClass("Humanoid")
 	if humanoid and humanoid.Health > 0 then
 		humanoid.Health = 0
+		humanoid.MaxHealth = 0
 	end
 end
 
@@ -362,7 +362,7 @@ end
 local function connectTouchedEvent(npc)
 	local hrp = npc:FindFirstChild("HumanoidRootPart")
 	if hrp and not hrp:GetAttribute("TouchedConnected") then
-		hrp:GetAttribute("TouchedConnected", true)
+		hrp:SetAttribute("TouchedConnected", true)
 		hrp.Touched:Connect(function(otherPart)
 			onNpcTouched(npc, otherPart)
 		end)
@@ -408,11 +408,9 @@ local function updateHighlights()
 	checkForNewNpcs()
 	for _, npc in pairs(npcs) do
 		if npc and isNpcAlive(npc) then
-			-- Создаем подсветку только если не в игнор-листе
 			if not npcHighlights[npc] and not ignoreList[npc.Name] then
 				npcHighlights[npc] = createHighlight(npc)
 			end
-			-- Создаем GUI только если не в игнор-листе
 			if not npcNameGuis[npc] and not ignoreList[npc.Name] then
 				createNpcGui(npc)
 			end
@@ -612,3 +610,43 @@ coroutine.wrap(function()
 		updateKillCount()
 	end
 end)()
+
+-- ==================== ДОБАВЛЕНИЕ ПЕРЕТАСКИВАНИЯ ====================
+local dragging = false
+local dragInput = nil
+local dragStart = nil
+local startPos = nil
+
+-- Обработчики для перетаскивания
+Frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = Frame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+Frame.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement then
+		dragInput = input
+	end
+end)
+
+game:GetService("RunService").Heartbeat:Connect(function()
+	if dragging and dragInput then
+		local delta = dragInput.Position - dragStart
+		Frame.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+	end
+	-- Остальной ваш существующий код внутри Heartbeat
+	-- (если есть, он уже есть выше, то его можно оставить или убрать)
+end)
