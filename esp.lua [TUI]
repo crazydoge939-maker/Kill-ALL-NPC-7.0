@@ -1,3 +1,4 @@
+
 -- ==================== ОСНОВНЫЕ ПЕРЕМЕННЫЕ ====================
 local isKilling = false
 local killInterval = 3
@@ -668,22 +669,22 @@ local function processKillQueue()
 				if teleportToNpc(npc) then
 					lastTeleportTime = tick()
 					local humanoid = npc:FindFirstChildOfClass("Humanoid")
+					local hrp = npc:FindFirstChild("HumanoidRootPart")
+					
 					if humanoid then
-						-- Метод 1: Изменить состояние на "мёртвый" (может сработать для локальных NPC)
-						humanoid:ChangeState(Enum.HumanoidStateType.Dead)
-						
-						-- Метод 2: Установить здоровье в 0
+						-- Метод 1: Прямое изменение здоровья
 						humanoid.Health = 0
-						
-						-- Метод 3: TakeDamage (для некоторых систем урона)
-						humanoid:TakeDamage(humanoid.MaxHealth)
-						
-						-- Метод 4: Удалить HumanoidRootPart (радикальный метод)
-						local hrp = npc:FindFirstChild("HumanoidRootPart")
-						if hrp then
-							hrp:Destroy()
-						end
+						-- Метод 2: TakeDamage
+						humanoid:TakeDamage(999999)
 					end
+					
+					-- Метод 3: Удаление HumanoidRootPart (вызывает смерть в некоторых играх)
+					if hrp then
+						hrp:Destroy()
+					end
+					
+					-- Метод 4: Полное удаление NPC локально
+					npc:Destroy()
 				end
 			end
 		end
