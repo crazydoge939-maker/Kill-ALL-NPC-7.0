@@ -669,7 +669,20 @@ local function processKillQueue()
 					lastTeleportTime = tick()
 					local humanoid = npc:FindFirstChildOfClass("Humanoid")
 					if humanoid then
+						-- Метод 1: Изменить состояние на "мёртвый" (может сработать для локальных NPC)
+						humanoid:ChangeState(Enum.HumanoidStateType.Dead)
+						
+						-- Метод 2: Установить здоровье в 0
 						humanoid.Health = 0
+						
+						-- Метод 3: TakeDamage (для некоторых систем урона)
+						humanoid:TakeDamage(humanoid.MaxHealth)
+						
+						-- Метод 4: Удалить HumanoidRootPart (радикальный метод)
+						local hrp = npc:FindFirstChild("HumanoidRootPart")
+						if hrp then
+							hrp:Destroy()
+						end
 					end
 				end
 			end
