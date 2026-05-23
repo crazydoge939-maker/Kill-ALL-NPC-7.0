@@ -7,7 +7,7 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 -- ==================== НАСТРОЙКИ ====================
-local MAX_CYCLES = 4 -- Сколько циклов NPC должен выжить перед смертью
+-- MAX_CYCLES заменён на систему периодов (npcKillPeriods / DEFAULT_KILL_PERIOD)
 local TELEPORT_DELAY = 1 -- Задержка между телепортациями к разным NPC (в секундах)
 
 -- ==================== СПИСКИ NPC ====================
@@ -50,8 +50,22 @@ local npcOriginalNames = {} -- {npc = originalName} -- сохраняем ори
 local npcKnownObjects = {} -- {["NPCName"] = {npc1, npc2, ...}} -- отслеживание известных NPC объектов по имени
 local npcHighlights = {} -- {npc = Highlight}
 local npcLines = {} -- {npc = {Beam, Attachment0, Attachment1, ...}}
+local npcInstancePeriods = {} -- {npc = period} -- индивидуальный период для каждого NPC
 local isEnabled = true -- состояние режима (включено/выключено)
 local lastTeleportTime = 0 -- время последней телепортации
+local killQueue = {} -- очередь NPC на убийство
+local isProcessingKills = false -- флаг обработки очереди убийств
+
+-- ==================== ПЕРИОДЫ УБИЙСТВА ====================
+local DEFAULT_KILL_PERIOD = 5 -- По умолчанию 5 циклов до убийства
+local npcKillPeriods = {
+	-- Можно задать индивидуальные периоды для конкретных NPC
+	-- ["Имя NPC"] = 3, -- убить через 3 цикла
+}
+
+local function getKillPeriod(npc)
+	return npcInstancePeriods[npc] or npcKillPeriods[npc.Name] or DEFAULT_KILL_PERIOD
+end
 
 -- ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ЦВЕТОВ ====================
 -- Получение цвета по типу NPC
@@ -74,8 +88,8 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 300, 0, 460)
-Frame.Position = UDim2.new(0, 20, 0, 20)
+Frame.Size = UDim2.new(0.18, 0, 0.55, 0)
+Frame.Position = UDim2.new(0.1, -155, 0.1, -64)
 Frame.BackgroundColor3 = Color3.fromRGB(40, 44, 52)
 Frame.BorderSizePixel = 0
 Frame.Parent = ScreenGui
@@ -92,20 +106,20 @@ UIGradient.Color = ColorSequence.new{
 UIGradient.Parent = Frame
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Size = UDim2.new(1, 0, 0.08, 0)
 Title.BackgroundTransparency = 1
 Title.Text = "Auto Killer"
 Title.Font = Enum.Font.Sarpanch
-Title.TextSize = 20
+Title.TextScaled = true
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Parent = Frame
 
 local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 120, 0, 40)
-ToggleButton.Position = UDim2.new(0, 20, 0, 50)
+ToggleButton.Size = UDim2.new(0.42, 0, 0.1, 0)
+ToggleButton.Position = UDim2.new(0.06, 0, 0.137, 0)
 ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
 ToggleButton.Font = Enum.Font.Sarpanch
-ToggleButton.TextSize = 16
+ToggleButton.TextScaled = true
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleButton.Text = "[Start] Kill"
 ToggleButton.Parent = Frame
@@ -114,25 +128,41 @@ local buttonCorner = Instance.new("UICorner")
 buttonCorner.CornerRadius = UDim.new(0, 8)
 buttonCorner.Parent = ToggleButton
 
-local KillCountLabel = Instance.new("TextLabel")
-KillCountLabel.Size = UDim2.new(1, -40, 0, 430)
-KillCountLabel.Position = UDim2.new(0, 20, 0, 100)
-KillCountLabel.BackgroundTransparency = 1
-KillCountLabel.Text = "Жертвы:\n"
-KillCountLabel.TextWrapped = true
-KillCountLabel.TextXAlignment = Enum.TextXAlignment.Left
-KillCountLabel.TextYAlignment = Enum.TextYAlignment.Top
-KillCountLabel.Font = Enum.Font.Sarpanch
-KillCountLabel.TextSize = 22
-KillCountLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-KillCountLabel.Parent = Frame
+-- ScrollingFrame для списка существ
+local CreatureScroll = Instance.new("ScrollingFrame")
+CreatureScroll.Name = "CreatureScroll"
+CreatureScroll.Size = UDim2.new(0.93, 0, 0.535, 0)
+CreatureScroll.Position = UDim2.new(0.035, 0, 0.25, 0)
+CreatureScroll.BackgroundColor3 = Color3.fromRGB(30, 34, 42)
+CreatureScroll.BackgroundTransparency = 0.5
+CreatureScroll.BorderSizePixel = 0
+CreatureScroll.ScrollBarThickness = 6
+CreatureScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+CreatureScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+CreatureScroll.Parent = Frame
+
+local scrollCorner = Instance.new("UICorner")
+scrollCorner.CornerRadius = UDim.new(0, 8)
+scrollCorner.Parent = CreatureScroll
+
+local creatureLayout = Instance.new("UIListLayout")
+creatureLayout.SortOrder = Enum.SortOrder.Name
+creatureLayout.Padding = UDim.new(0, 4)
+creatureLayout.Parent = CreatureScroll
+
+local creaturePad = Instance.new("UIPadding")
+creaturePad.PaddingLeft = UDim.new(0, 6)
+creaturePad.PaddingRight = UDim.new(0, 6)
+creaturePad.PaddingTop = UDim.new(0, 6)
+creaturePad.PaddingBottom = UDim.new(0, 6)
+creaturePad.Parent = CreatureScroll
 
 local toggleModeButton = Instance.new("TextButton")
-toggleModeButton.Size = UDim2.new(0, 120, 0, 40)
-toggleModeButton.Position = UDim2.new(0, 150, 0, 50)
+toggleModeButton.Size = UDim2.new(0.42, 0, 0.1, 0)
+toggleModeButton.Position = UDim2.new(0.52, 0, 0.137, 0)
 toggleModeButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
 toggleModeButton.Font = Enum.Font.Sarpanch
-toggleModeButton.TextSize = 16
+toggleModeButton.TextScaled = true
 toggleModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleModeButton.Text = "[OFF] Подсветку"
 toggleModeButton.Parent = Frame
@@ -141,56 +171,85 @@ local buttonCorner2 = Instance.new("UICorner")
 buttonCorner2.CornerRadius = UDim.new(0, 8)
 buttonCorner2.Parent = toggleModeButton
 
--- Настройки задержки телепортации
-local teleportDelaySettings = Instance.new("Frame")
-teleportDelaySettings.Size = UDim2.new(1, -40, 0, 60)
-teleportDelaySettings.Position = UDim2.new(0, 20, 0, 340)
-teleportDelaySettings.BackgroundTransparency = 1
-teleportDelaySettings.Parent = Frame
+-- ==================== НАСТРОЙКИ ====================
+local settingsFrame = Instance.new("Frame")
+settingsFrame.Size = UDim2.new(1, 0, 0.2, 0)
+settingsFrame.Position = UDim2.new(0, 0, 0.8, 0)
+settingsFrame.BackgroundTransparency = 1
+settingsFrame.Parent = Frame
 
-local teleportDelayLabel = Instance.new("TextLabel")
-teleportDelayLabel.Size = UDim2.new(1, 0, 0, 20)
-teleportDelayLabel.Position = UDim2.new(0, 0, 0, 55)
-teleportDelayLabel.BackgroundTransparency = 1
-teleportDelayLabel.Text = "Задержка между TP:"
-teleportDelayLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-teleportDelayLabel.TextXAlignment = Enum.TextXAlignment.Left
-teleportDelayLabel.Font = Enum.Font.Gotham
-teleportDelayLabel.TextSize = 14
-teleportDelayLabel.Parent = teleportDelaySettings
+-- Вспомогательная функция для создания строки настроек
+local function createSettingRow(parent, labelText, inputValue, yPos)
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(0.55, 0, 0.26, 0)
+	label.Position = UDim2.new(0, 0, yPos, 0)
+	label.BackgroundTransparency = 1
+	label.Text = labelText
+	label.TextColor3 = Color3.fromRGB(200, 200, 200)
+	label.TextXAlignment = Enum.TextXAlignment.Right
+	label.Font = Enum.Font.Gotham
+	label.TextScaled = true
+	label.Parent = parent
 
-local teleportDelayDropdown = Instance.new("TextButton")
-teleportDelayDropdown.Size = UDim2.new(1, 0, 0, 30)
-teleportDelayDropdown.Position = UDim2.new(0, 0, 0, 75)
-teleportDelayDropdown.BackgroundColor3 = Color3.fromRGB(60, 64, 72)
-teleportDelayDropdown.Text = tostring(TELEPORT_DELAY) .. " сек"
-teleportDelayDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
-teleportDelayDropdown.Font = Enum.Font.Gotham
-teleportDelayDropdown.TextSize = 14
-teleportDelayDropdown.Parent = teleportDelaySettings
+	local input = Instance.new("TextBox")
+	input.Size = UDim2.new(0.38, 0, 0.28, 0)
+	input.Position = UDim2.new(0.6, 0, yPos, 0)
+	input.BackgroundColor3 = Color3.fromRGB(60, 64, 72)
+	input.Text = tostring(inputValue)
+	input.TextColor3 = Color3.fromRGB(255, 255, 255)
+	input.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+	input.Font = Enum.Font.Gotham
+	input.TextScaled = true
+	input.ClearTextOnFocus = false
+	input.Parent = parent
 
-local teleportDelayCorner = Instance.new("UICorner")
-teleportDelayCorner.CornerRadius = UDim.new(0, 6)
-teleportDelayCorner.Parent = teleportDelayDropdown
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 6)
+	corner.Parent = input
 
--- Список доступных задержек
-local delayOptions = {0.5, 1, 2, 3, 4, 5}
-local currentDelayIndex = 3 -- по умолчанию 0.5 сек
+	return input
+end
 
--- Переключение задержки телепортации
-teleportDelayDropdown.MouseButton1Click:Connect(function()
-	currentDelayIndex = currentDelayIndex + 1
-	if currentDelayIndex > #delayOptions then
-		currentDelayIndex = 1
+-- Цикл (интервал между циклами в секундах)
+local killIntervalInput = createSettingRow(settingsFrame, "Цикл (сек):", killInterval, 0.0)
+killIntervalInput.FocusLost:Connect(function()
+	local num = tonumber(killIntervalInput.Text)
+	if num and num > 0 then
+		killInterval = num
+		killIntervalInput.Text = tostring(num)
+	else
+		killIntervalInput.Text = tostring(killInterval)
 	end
-	TELEPORT_DELAY = delayOptions[currentDelayIndex]
-	teleportDelayDropdown.Text = tostring(TELEPORT_DELAY) .. " сек"
+end)
+
+-- Период (циклов до убийства)
+local killPeriodInput = createSettingRow(settingsFrame, "Период:", DEFAULT_KILL_PERIOD, 0.35)
+killPeriodInput.FocusLost:Connect(function()
+	local num = tonumber(killPeriodInput.Text)
+	if num and num > 0 then
+		DEFAULT_KILL_PERIOD = num
+		killPeriodInput.Text = tostring(num)
+	else
+		killPeriodInput.Text = tostring(DEFAULT_KILL_PERIOD)
+	end
+end)
+
+-- TP CD (задержка телепортации)
+local teleportDelayInput = createSettingRow(settingsFrame, "TP CD (сек):", TELEPORT_DELAY, 0.7)
+teleportDelayInput.FocusLost:Connect(function()
+	local num = tonumber(teleportDelayInput.Text)
+	if num and num > 0 then
+		TELEPORT_DELAY = num
+		teleportDelayInput.Text = tostring(num)
+	else
+		teleportDelayInput.Text = tostring(TELEPORT_DELAY)
+	end
 end)
 
 -- Линия прогресса
 local ProgressBackground = Instance.new("Frame")
-ProgressBackground.Size = UDim2.new(1, -40, 0, 10)
-ProgressBackground.Position = UDim2.new(0, 20, 0, 30)
+ProgressBackground.Size = UDim2.new(0.86, 0, 0.02, 0)
+ProgressBackground.Position = UDim2.new(0.07, 0, 0.08, 0)
 ProgressBackground.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 ProgressBackground.BorderSizePixel = 0
 ProgressBackground.Parent = Frame
@@ -271,17 +330,17 @@ local function createNpcGui(npc)
 	npcCycleLabels[npc] = cycleLabel
 	npcCycles[npc] = 0 -- Инициализируем цикл NPC
 	npcOriginalNames[npc] = npc.Name -- Сохраняем оригинальное имя
+	npcInstancePeriods[npc] = npcKillPeriods[npc.Name] or DEFAULT_KILL_PERIOD -- Индивидуальный период
 end
 
 local function updateNpcCycleDisplay(npc)
 	local cycleLabel = npcCycleLabels[npc]
 	if cycleLabel and npcCycles[npc] ~= nil then
-		-- Рассчитываем процент (с ограничением до 100%)
-		local percentage = math.min(math.floor((npcCycles[npc] / MAX_CYCLES) * 100), 100)
-		cycleLabel.Text = "[" .. percentage .. "%]"
+		local period = npcInstancePeriods[npc] or DEFAULT_KILL_PERIOD
+		cycleLabel.Text = "[" .. npcCycles[npc] .. "/" .. period .. "]"
 
-		-- Меняем цвет когда близко к смерти (95%+)
-		if npcCycles[npc] >= MAX_CYCLES - 1 then
+		-- Меняем цвет когда близко к смерти (1 цикл до смерти)
+		if npcCycles[npc] >= period - 1 then
 			cycleLabel.TextColor3 = Color3.fromRGB(255, 50, 50) -- Ярко-красный
 
 			-- Также обновляем цвет имени
@@ -444,9 +503,10 @@ local function cleanupNpcData(npc)
 		npcHighlights[npc] = nil
 	end
 
-	-- Очищаем данные о цикле
+	-- Очищаем данные о цикле и периоде
 	npcCycles[npc] = nil
 	npcOriginalNames[npc] = nil
+	npcInstancePeriods[npc] = nil
 
 	-- Удаляем из известных объектов
 	local npcName = npc.Name
@@ -590,12 +650,38 @@ local function updateLines()
 end
 
 -- ==================== СИСТЕМА УБИЙСТВА С ТЕЛЕПОРТАЦИЕЙ ====================
-local function killNpcsOnCycle()
-	local currentTime = tick()
-	local npcs = findHumanoids()
+-- Обработка очереди убийств в отдельном потоке (с ожиданиями)
+local function processKillQueue()
+	if isProcessingKills then return end
+	isProcessingKills = true
 
-	-- Собираем NPC для убийства
-	local npcsToKill = {}
+	while #killQueue > 0 do
+		local npc = table.remove(killQueue, 1)
+		if isNpcAlive(npc) then
+			local currentTime = tick()
+			local timeSinceLastTP = currentTime - lastTeleportTime
+			if timeSinceLastTP < TELEPORT_DELAY then
+				task.wait(TELEPORT_DELAY - timeSinceLastTP)
+			end
+
+			if isNpcAlive(npc) then
+				if teleportToNpc(npc) then
+					lastTeleportTime = tick()
+					local humanoid = npc:FindFirstChildOfClass("Humanoid")
+					if humanoid then
+						humanoid.Health = 0
+					end
+				end
+			end
+		end
+		cleanupNpcData(npc)
+	end
+
+	isProcessingKills = false
+end
+
+local function killNpcsOnCycle()
+	local npcs = findHumanoids()
 
 	for _, npc in pairs(npcs) do
 		if isNpcAlive(npc) then
@@ -606,132 +692,147 @@ local function killNpcsOnCycle()
 				continue
 			end
 
+			-- Пропускаем NPC уже в очереди на убийство
+			local inQueue = false
+			for _, queuedNpc in ipairs(killQueue) do
+				if queuedNpc == npc then
+					inQueue = true
+					break
+				end
+			end
+			if inQueue then continue end
+
 			-- Инициализируем цикл если еще нет
-			if not npcCycles[npc] then
+			if npcCycles[npc] == nil then
 				npcCycles[npc] = 0
 				updateNpcCycleDisplay(npc)
 			end
 
-			-- Увеличиваем счетчик циклов с ограничением MAX_CYCLES
-			npcCycles[npc] = math.min(npcCycles[npc] + 1, MAX_CYCLES)
+			-- Увеличиваем счетчик циклов с ограничением по периоду
+			local period = npcInstancePeriods[npc] or DEFAULT_KILL_PERIOD
+			npcCycles[npc] = math.min(npcCycles[npc] + 1, period)
 			updateNpcCycleDisplay(npc)
 
 			-- Проверяем нужно ли убить NPC
-			if npcCycles[npc] >= MAX_CYCLES then
-				table.insert(npcsToKill, npc)
+			if npcCycles[npc] >= period then
+				table.insert(killQueue, npc)
 			end
 		end
 	end
 
-	-- Телепортируемся к NPC с одинаковым циклом по очереди
-	for _, npc in ipairs(npcsToKill) do
-		if isNpcAlive(npc) then
-			-- Проверяем задержку между телепортациями
-			if currentTime - lastTeleportTime >= TELEPORT_DELAY then
-				-- Телепортируемся к NPC
-				if teleportToNpc(npc) then
-					lastTeleportTime = currentTime
-
-					-- Убиваем NPC после телепортации
-					local humanoid = npc:FindFirstChildOfClass("Humanoid")
-					if humanoid then
-						humanoid.Health = 0
-					end
-				end
-			else
-				-- Ждем оставшееся время и телепортируемся
-				wait(TELEPORT_DELAY - (currentTime - lastTeleportTime))
-
-				if isNpcAlive(npc) then
-					if teleportToNpc(npc) then
-						lastTeleportTime = tick()
-
-						-- Убиваем NPC после телепортации
-						local humanoid = npc:FindFirstChildOfClass("Humanoid")
-						if humanoid then
-							humanoid.Health = 0
-						end
-					end
-				end
-			end
-		end
-
-		-- Очищаем данные после убийства
-		cleanupNpcData(npc)
+	-- Запускаем обработку очереди в отдельном потоке
+	if #killQueue > 0 and not isProcessingKills then
+		coroutine.wrap(processKillQueue)()
 	end
 end
 
--- ==================== ОБНОВЛЕНИЕ СЧЕТЧИКА УБИЙСТВ ====================
-KillCountLabel.RichText = true
-local previousCount = {}
+-- ==================== ОБНОВЛЕНИЕ СПИСКА СУЩЕСТВ ====================
+local creatureEntries = {} -- {name = Frame}
+local npcPreviousCounts = {} -- {["NPCName"] = count} предыдущие количества
+local npcDotTimers = {} -- {["NPCName"] = {color = Color3, time = tick()}}
 
-local function updateKillCount()
-	local killedHumanoidsCount = {}
-	local currentTime = tick()
-
-	-- Собираем текущих NPC
-	local currentNPCs = {}
-	for _, npc in pairs(findHumanoids()) do
-		local name = npc.Name
-		currentNPCs[name] = true
-
-		if not npcDisplayStates[name] then
-			npcDisplayStates[name] = {type = "green", time = currentTime}
-		end
-
-		killedHumanoidsCount[name] = (killedHumanoidsCount[name] or 0) + 1
+local function updateCreatureList()
+	-- Очищаем старые записи
+	for name, entry in pairs(creatureEntries) do
+		entry:Destroy()
 	end
+	creatureEntries = {}
 
-	-- Удаляем состояния для исчезнувших NPC
-	for name, _ in pairs(previousCount) do
-		if not currentNPCs[name] then
-			npcDisplayStates[name] = nil
+	local npcs = findHumanoids()
+	local nameGroups = {} -- {["NPCName"] = count}
+
+	for _, npc in pairs(npcs) do
+		if isNpcAlive(npc) then
+			local name = npc.Name
+			nameGroups[name] = (nameGroups[name] or 0) + 1
 		end
 	end
 
-	-- Обновляем состояния
-	for name, count in pairs(killedHumanoidsCount) do
-		if not previousCount[name] then
-			npcDisplayStates[name] = {type = "green", time = currentTime}
-		elseif count ~= previousCount[name] then
-			npcDisplayStates[name] = {type = "yellow", time = currentTime}
+	-- Проверяем изменения количества для точек-индикаторов
+	for name, count in pairs(nameGroups) do
+		local prevCount = npcPreviousCounts[name]
+		if prevCount == nil then
+			-- Новая сущность — зелёная точка
+			npcDotTimers[name] = {color = Color3.fromRGB(0, 255, 0), time = tick()}
+		elseif count > prevCount then
+			-- Количество увеличилось — зелёная точка
+			npcDotTimers[name] = {color = Color3.fromRGB(0, 255, 0), time = tick()}
+		elseif count < prevCount then
+			-- Количество уменьшилось — красная точка
+			npcDotTimers[name] = {color = Color3.fromRGB(255, 0, 0), time = tick()}
 		end
 	end
 
-	previousCount = table.clone(killedHumanoidsCount)
+	-- Обновляем предыдущие количества
+	npcPreviousCounts = {}
+	for name, count in pairs(nameGroups) do
+		npcPreviousCounts[name] = count
+	end
 
-	-- Формируем текст
-	local displayText = "Жертвы:\n"
-	for name, count in pairs(killedHumanoidsCount) do
-		local state = npcDisplayStates[name]
-		local elapsed = currentTime - (state and state.time or currentTime)
-		local progress = math.clamp(elapsed / 10, 0, 1)
+	-- Очищаем устаревшие таймеры точек (старше 5 сек)
+	for name, timer in pairs(npcDotTimers) do
+		if tick() - timer.time >= 5 then
+			npcDotTimers[name] = nil
+		end
+	end
 
-		local color
-		if state then
-			if state.type == "green" then
-				color = string.format('rgb(%d,%d,%d)', 
-					math.floor(0 + 255 * progress),
-					255,
-					math.floor(0 + 255 * progress))
-			elseif state.type == "yellow" then
-				color = string.format('rgb(255,255,%d)', math.floor(255 * progress))
+	-- Сортируем по имени
+	local sortedNames = {}
+	for name in pairs(nameGroups) do
+		table.insert(sortedNames, name)
+	end
+	table.sort(sortedNames)
+
+	for _, name in ipairs(sortedNames) do
+		local count = nameGroups[name]
+		local npcColor = getNpcColor(name)
+
+		local entry = Instance.new("Frame")
+		entry.Size = UDim2.new(1, 0, 0.1, 0)
+		entry.BackgroundColor3 = Color3.fromRGB(50, 54, 62)
+		entry.BorderSizePixel = 0
+		entry.Parent = CreatureScroll
+
+		local entryCorner = Instance.new("UICorner")
+		entryCorner.CornerRadius = UDim.new(0, 6)
+		entryCorner.Parent = entry
+
+		local nameLabel = Instance.new("TextLabel")
+		nameLabel.Size = UDim2.new(1, -20, 1, 0)
+		nameLabel.BackgroundTransparency = 1
+		nameLabel.Text = name .. " x" .. count
+		nameLabel.TextColor3 = npcColor
+		nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+		nameLabel.Font = Enum.Font.Sarpanch
+		nameLabel.TextScaled = true
+		nameLabel.Parent = entry
+
+		local namePad = Instance.new("UIPadding")
+		namePad.PaddingLeft = UDim.new(0, 8)
+		namePad.Parent = nameLabel
+
+		-- Точка-индикатор справа (появление/изменение количества)
+		local dotTimer = npcDotTimers[name]
+		if dotTimer then
+			local elapsed = tick() - dotTimer.time
+			if elapsed < 5 then
+				local dotTransparency = elapsed / 5
+				local dot = Instance.new("Frame")
+				dot.Size = UDim2.new(0.1, 0, 0.3, 0)
+				dot.Position = UDim2.new(0.85, 0, 0.3, 0)
+				dot.BackgroundColor3 = dotTimer.color
+				dot.BackgroundTransparency = dotTransparency
+				dot.BorderSizePixel = 0
+				dot.Parent = entry
+
+				local dotCorner = Instance.new("UICorner")
+				dotCorner.CornerRadius = UDim.new(1, 0)
+				dotCorner.Parent = dot
 			end
-		else
-			color = 'rgb(255,255,255)'
 		end
 
-		-- Исправленное формирование строки
-		local countSuffix = ""
-		if count > 1 then
-			countSuffix = " x" .. tostring(count)
-		end
-
-		displayText = displayText .. string.format('<font color="%s">%s%s</font>\n', 
-			color, name, countSuffix)
+		creatureEntries[name] = entry
 	end
-
-	KillCountLabel.Text = displayText
 end
 
 -- ==================== ПЕРЕКЛЮЧЕНИЕ РЕЖИМА ====================
@@ -803,7 +904,7 @@ runService.Heartbeat:Connect(function()
 		if elapsed >= killInterval then
 			killNpcsOnCycle()
 			lastKillTime = currentTime
-			updateKillCount()
+			updateCreatureList()
 		end
 	else
 		ProgressBar.Size = UDim2.new(0, 0, 1, 0)
@@ -865,7 +966,7 @@ end)()
 coroutine.wrap(function()
 	while true do
 		wait(0.5)
-		updateKillCount()
+		updateCreatureList()
 	end
 end)()
 
