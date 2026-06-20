@@ -478,7 +478,7 @@ local function teleportToNpc(npc)
 	if not playerHrp or not npcHrp then return false end
 
 	-- Телепортируем игрока к NPC
-	playerHrp.CFrame = npcHrp.CFrame + Vector3.new(0, 3, 0) -- Немного выше NPC
+	playerHrp.CFrame = npcHrp.CFrame + Vector3.new(0, 20, 0) -- Немного выше NPC
 
 	print("[Auto Killer] Телепортировался к NPC: " .. npc.Name)
 	return true
