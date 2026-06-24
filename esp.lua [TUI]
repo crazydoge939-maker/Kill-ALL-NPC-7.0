@@ -37,6 +37,7 @@ local specialNPCs = {
 	["Space Eater"] = true,
 	["Red Nemesis"] = true,
 	["Paladin"] = true,
+	["Oueen Bug"] = true,
 	["Ophaenem"] = true,
 	["Santa-NK1"] = true,
 }
@@ -684,6 +685,8 @@ end
 
 local function killNpcsOnCycle()
 	local npcs = findHumanoids()
+	local specialReady = {} -- specialNPCs, готовые к убийству
+	local regularReady = {} -- обычные NPC, готовые к убийству
 
 	for _, npc in pairs(npcs) do
 		if isNpcAlive(npc) then
@@ -715,11 +718,23 @@ local function killNpcsOnCycle()
 			npcCycles[npc] = math.min(npcCycles[npc] + 1, period)
 			updateNpcCycleDisplay(npc)
 
-			-- Проверяем нужно ли убить NPC
+			-- Проверяем нужно ли убить NPC и распределяем по приоритету
 			if npcCycles[npc] >= period then
-				table.insert(killQueue, npc)
+				if specialNPCs[name] then
+					table.insert(specialReady, npc)
+				else
+					table.insert(regularReady, npc)
+				end
 			end
 		end
+	end
+
+	-- Добавляем в очередь сначала special NPC, потом обычных
+	for _, npc in ipairs(specialReady) do
+		table.insert(killQueue, npc)
+	end
+	for _, npc in ipairs(regularReady) do
+		table.insert(killQueue, npc)
 	end
 
 	-- Запускаем обработку очереди в отдельном потоке
