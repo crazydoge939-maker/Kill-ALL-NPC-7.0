@@ -37,7 +37,7 @@ local specialNPCs = {
 	["Space Eater"] = true,
 	["Red Nemesis"] = true,
 	["Paladin"] = true,
-	["Oueen Bug"] = true,
+	["Queen Bug"] = true,
 	["Ophaenem"] = true,
 	["Santa-NK1"] = true,
 }
