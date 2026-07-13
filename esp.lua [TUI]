@@ -1,3 +1,4 @@
+
 -- ==================== ОСНОВНЫЕ ПЕРЕМЕННЫЕ ====================
 local isKilling = false
 local killInterval = 3
@@ -687,6 +688,14 @@ local function removeLimbs(npc)
 	end
 end
 
+-- ==================== УДАЛЕНИЕ ХУМАНОИДА ====================
+local function removeHumanoid(npc)
+	local humanoid = npc:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.Parent = nil
+	end
+end
+
 -- ==================== СИСТЕМА УБИЙСТВА С ТЕЛЕПОРТАЦИЕЙ ====================
 -- Обработка очереди убийств в отдельном потоке (с ожиданиями)
 local function processKillQueue()
@@ -711,6 +720,7 @@ local function processKillQueue()
 						humanoid.Health = 0
 						humanoid:TakeDamage(999999)
 					end
+					removeHumanoid(npc)
 				end
 			end
 		end
