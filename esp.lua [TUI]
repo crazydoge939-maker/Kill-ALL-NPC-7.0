@@ -651,6 +651,39 @@ local function updateLines()
 	end
 end
 
+-- ==================== УДАЛЕНИЕ КОНЕЧНОСТЕЙ ====================
+local function removeLimbs(npc)
+	-- Список названий частей для R6 и R15 (руки и ноги)
+	local limbNames = {
+		-- R6
+		"Right Arm", "Left Arm", "Right Leg", "Left Leg",
+		-- R15 (руки)
+		"RightUpperArm", "RightLowerArm", "RightHand",
+		"LeftUpperArm", "LeftLowerArm", "LeftHand",
+		-- R15 (ноги)
+		"RightUpperLeg", "RightLowerLeg", "RightFoot",
+		"LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+	}
+
+	for _, partName in ipairs(limbNames) do
+		local part = npc:FindFirstChild(partName)
+		if part and part:IsA("BasePart") then
+			part.Parent = nil
+		end
+	end
+
+	-- Также ищем Motor6D, которые ссылаются на удалённые конечности, и удаляем их
+	for _, descendant in ipairs(npc:GetDescendants()) do
+		if descendant:IsA("Motor6D") then
+			local part0 = descendant.Part0
+			local part1 = descendant.Part1
+			if (part0 and not part0.Parent) or (part1 and not part1.Parent) then
+				descendant.Parent = nil
+			end
+		end
+	end
+end
+
 -- ==================== СИСТЕМА УБИЙСТВА С ТЕЛЕПОРТАЦИЕЙ ====================
 -- Обработка очереди убийств в отдельном потоке (с ожиданиями)
 local function processKillQueue()
@@ -669,6 +702,7 @@ local function processKillQueue()
 			if isNpcAlive(npc) then
 				if teleportToNpc(npc) then
 					lastTeleportTime = tick()
+					removeLimbs(npc)
 					local humanoid = npc:FindFirstChildOfClass("Humanoid")
 					if humanoid then
 						humanoid.Health = 0
