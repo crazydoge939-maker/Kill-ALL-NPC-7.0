@@ -438,19 +438,30 @@ local function createLine(npc)
 end
 
 -- ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+-- Кэш NPC: сканируем workspace не чаще 1 раза в секунду, а не при каждом вызове
+local npcCache = {}
+local lastNpcScan = 0
+local NPC_SCAN_INTERVAL = 1
+
 local function findHumanoids()
-	local npcs = {}
-	for _, v in pairs(workspace:GetDescendants()) do
-		if v:IsA("Humanoid") and v.Parent and v.Parent:FindFirstChildOfClass("Humanoid") then
-			if not game.Players:GetPlayerFromCharacter(v.Parent) then
-				table.insert(npcs, v.Parent)
+	local now = tick()
+	if now - lastNpcScan >= NPC_SCAN_INTERVAL then
+		npcCache = {}
+		for _, v in pairs(workspace:GetDescendants()) do
+			if v:IsA("Humanoid") and v.Parent and v.Parent:FindFirstChildOfClass("Humanoid") then
+				if not game.Players:GetPlayerFromCharacter(v.Parent) then
+					table.insert(npcCache, v.Parent)
+				end
 			end
 		end
+		lastNpcScan = now
 	end
-	return npcs
+	return npcCache
 end
 
 local function isNpcAlive(npc)
+	-- Проверяем, что NPC ещё существует (не уничтожен и не удалён из workspace)
+	if not npc or not npc.Parent then return false end
 	local humanoid = npc:FindFirstChildOfClass("Humanoid")
 	local hrp = npc:FindFirstChild("HumanoidRootPart")
 	return humanoid and humanoid.Health > 0 and hrp
@@ -487,6 +498,9 @@ end
 
 -- ==================== ОЧИСТКА ДАННЫХ NPC ====================
 local function cleanupNpcData(npc)
+	-- Защита от уничтоженных/несуществующих NPC
+	if not npc or not npc.Parent then return end
+
 	-- Удаляем линию
 	if npcLines[npc] then
 		npcLines[npc].Beam:Destroy()
@@ -926,49 +940,6 @@ runService.Heartbeat:Connect(function()
 	else
 		ProgressBar.Size = UDim2.new(0, 0, 1, 0)
 	end
-
-	-- Обновление линий
-	local playerPos = getPlayerPosition()
-	if playerPos then
-		for npc, highlight in pairs(npcHighlights) do
-			if isNpcAlive(npc) and highlight.Enabled then
-				local lineData = npcLines[npc]
-
-				if not lineData then
-					lineData = createLine(npc)
-					npcLines[npc] = lineData
-				end
-
-				if lineData then
-					lineData.TargetPos0 = playerPos
-					local npcHrp = npc:FindFirstChild("HumanoidRootPart")
-					if npcHrp then
-						lineData.TargetPos1 = npcHrp.Position
-					end
-
-					lineData.Attachment0.WorldPosition = lineData.Attachment0.WorldPosition:Lerp(lineData.TargetPos0, smoothingFactor)
-					lineData.Attachment1.WorldPosition = lineData.Attachment1.WorldPosition:Lerp(lineData.TargetPos1, smoothingFactor)
-				end
-			else
-				if npcLines[npc] then
-					npcLines[npc].Beam:Destroy()
-					npcLines[npc].Attachment0:Destroy()
-					npcLines[npc].Attachment1:Destroy()
-					npcLines[npc] = nil
-				end
-			end
-		end
-	end
-
-	-- Удаляем линии для мертвых NPC
-	for npc, lineData in pairs(npcLines) do
-		if not isNpcAlive(npc) or not (npcHighlights[npc] and npcHighlights[npc].Enabled) then
-			lineData.Beam:Destroy()
-			lineData.Attachment0:Destroy()
-			lineData.Attachment1:Destroy()
-			npcLines[npc] = nil
-		end
-	end
 end)
 
 -- ==================== ФОНОВЫЕ ОБНОВЛЕНИЯ ====================
@@ -976,6 +947,12 @@ coroutine.wrap(function()
 	while true do
 		wait(1)
 		updateHighlights()
+	end
+end)()
+
+coroutine.wrap(function()
+	while true do
+		wait(0.2)
 		updateLines()
 	end
 end)()
