@@ -19,6 +19,17 @@ local doNotKillList = {
 	["Fruit Dealer"] = true
 }
 
+-- Существа, данные которых НЕ нужно обновлять (не удаляются из списков при обновлении)
+local noRefreshList = {
+	["Bug"] = true,
+	["Troll-096"] = true,
+	["Trollge King"] = true,
+	["Corruption"] = true,
+	["The Roofs"] = true,
+	["Space Eater"] = true,
+	["Red Nemesis"] = true,
+}
+
 -- Особые NPC (желтая подсветка)
 local specialNPCs = {
 	["Elf Traveler"] = true,
@@ -498,8 +509,8 @@ end
 
 -- ==================== ОЧИСТКА ДАННЫХ NPC ====================
 local function cleanupNpcData(npc)
-	-- Защита от уничтоженных/несуществующих NPC
-	if not npc or not npc.Parent then return end
+	-- Защита от nil (объект может быть уже уничтожен — это нормально, данные всё равно чистим)
+	if not npc then return end
 
 	-- Удаляем линию
 	if npcLines[npc] then
@@ -866,6 +877,85 @@ local function updateCreatureList()
 	end
 end
 
+-- ==================== ПЕРИОДИЧЕСКОЕ ОБНОВЛЕНИЕ ДАННЫХ О СУЩЕСТВАХ ====================
+-- Каждые REFRESH_INTERVAL секунд пересканируем живых существ, чистим устаревшие
+-- записи и повторно ставим в очередь тех, кого не удалось убить.
+local REFRESH_INTERVAL = 5
+
+local function refreshCreatureData()
+	-- Принудительно пересканируем workspace (обход кэша)
+	lastNpcScan = 0
+	local liveNpcs = findHumanoids()
+
+	-- Собираем множество всех живых существ
+	local liveSet = {}
+	for _, npc in pairs(liveNpcs) do
+		if isNpcAlive(npc) then
+			liveSet[npc] = true
+		end
+	end
+
+	-- Сверяем известных NPC: мёртвых/исчезнувших удаляем из списков,
+	-- кроме существ из noRefreshList — их данные не трогаем
+	for name, npcList in pairs(npcKnownObjects) do
+		if not noRefreshList[name] then
+			for i = #npcList, 1, -1 do
+				local npc = npcList[i]
+				if not liveSet[npc] then
+					table.remove(npcList, i)
+					cleanupNpcData(npc)
+				end
+			end
+			if #npcList == 0 then
+				npcKnownObjects[name] = nil
+			end
+		end
+	end
+
+	-- Чистим следящие таблицы от объектов, которых больше нет (GUI, подсветка, циклы)
+	for npc in pairs(npcCycles) do
+		if not liveSet[npc] and not noRefreshList[npc.Name] then
+			cleanupNpcData(npc)
+		end
+	end
+	for npc in pairs(npcNameGuis) do
+		if not liveSet[npc] and not noRefreshList[npc.Name] then
+			cleanupNpcData(npc)
+		end
+	end
+	for npc in pairs(npcHighlights) do
+		if not liveSet[npc] and not noRefreshList[npc.Name] then
+			cleanupNpcData(npc)
+		end
+	end
+
+	-- Повторно ставим в очередь NPC, которых не удалось убить ранее
+	if isKilling then
+		for npc, cycles in pairs(npcCycles) do
+			if liveSet[npc] and cycles >= (npcInstancePeriods[npc] or DEFAULT_KILL_PERIOD)
+				and not doNotKillList[npc.Name] then
+				local inQueue = false
+				for _, queuedNpc in ipairs(killQueue) do
+					if queuedNpc == npc then
+						inQueue = true
+						break
+					end
+				end
+				if not inQueue then
+					table.insert(killQueue, npc)
+				end
+			end
+		end
+		if #killQueue > 0 and not isProcessingKills then
+			coroutine.wrap(processKillQueue)()
+		end
+	end
+
+	-- Заново регистрируем всех живых NPC и обновляем список существ в GUI
+	checkForNewNpcs()
+	updateCreatureList()
+end
+
 -- ==================== ПЕРЕКЛЮЧЕНИЕ РЕЖИМА ====================
 local function toggleKilling()
 	isKilling = not isKilling
@@ -959,8 +1049,16 @@ end)()
 
 coroutine.wrap(function()
 	while true do
-		wait(0.5)
+		task.wait(0.5)
 		updateCreatureList()
+	end
+end)()
+
+-- Периодическое обновление данных о живых существах (каждые 5 секунд)
+coroutine.wrap(function()
+	while true do
+		task.wait(REFRESH_INTERVAL)
+		refreshCreatureData()
 	end
 end)()
 
