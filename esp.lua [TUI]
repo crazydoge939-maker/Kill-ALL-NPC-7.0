@@ -532,6 +532,7 @@ local function cleanupNpcData(npc)
 
 	-- Очищаем данные о цикле и периоде
 	npcCycles[npc] = nil
+	npcCycleLabels[npc] = nil
 	npcOriginalNames[npc] = nil
 	npcInstancePeriods[npc] = nil
 
@@ -621,19 +622,22 @@ local function updateHighlights()
 		end
 	end
 
-	-- Удаляем данные для мертвых NPC
-	for npc, highlight in pairs(npcHighlights) do
+	-- Удаляем данные для мертвых NPC: сначала собираем ключи, и только
+	-- потом чистим — cleanupNpcData удаляет элементы из npcHighlights и
+	-- npcNameGuis, вызывать её внутри pairs-цикла по этим же таблицам нельзя
+	local deadNpcs = {}
+	for npc in pairs(npcHighlights) do
 		if not isNpcAlive(npc) then
-			highlight.Enabled = false
-			-- Очищаем данные мертвого NPC
-			cleanupNpcData(npc)
+			table.insert(deadNpcs, npc)
 		end
 	end
-
-	for npc, gui in pairs(npcNameGuis) do
+	for npc in pairs(npcNameGuis) do
 		if not isNpcAlive(npc) then
-			gui.Enabled = false
+			table.insert(deadNpcs, npc)
 		end
+	end
+	for _, npc in ipairs(deadNpcs) do
+		cleanupNpcData(npc)
 	end
 end
 
@@ -661,8 +665,12 @@ local function updateLines()
 				end
 
 				-- Плавное перемещение
+			if lineData.TargetPos0 then
 				lineData.Attachment0.WorldPosition = lineData.Attachment0.WorldPosition:Lerp(lineData.TargetPos0, smoothingFactor)
+			end
+			if lineData.TargetPos1 then
 				lineData.Attachment1.WorldPosition = lineData.Attachment1.WorldPosition:Lerp(lineData.TargetPos1, smoothingFactor)
+			end
 			end
 		else
 			-- Удаляем линию если NPC мертв или подсветка выключена
@@ -684,25 +692,38 @@ local function processKillQueue()
 
 	while #killQueue > 0 do
 		local npc = table.remove(killQueue, 1)
-		if isNpcAlive(npc) then
-			local currentTime = tick()
-			local timeSinceLastTP = currentTime - lastTeleportTime
-			if timeSinceLastTP < TELEPORT_DELAY then
-				task.wait(TELEPORT_DELAY - timeSinceLastTP)
-			end
-
+		-- Обработка одного NPC защищена pcall: ошибка не убивает поток
+		-- и не оставляет isProcessingKills навсегда включённым
+		local ok, err = pcall(function()
 			if isNpcAlive(npc) then
-				if teleportToNpc(npc) then
-					lastTeleportTime = tick()
-					local humanoid = npc:FindFirstChildOfClass("Humanoid")
-					if humanoid then
-						humanoid.Health = 0
-						humanoid:TakeDamage(999999)
+				local currentTime = tick()
+				local timeSinceLastTP = currentTime - lastTeleportTime
+				if timeSinceLastTP < TELEPORT_DELAY then
+					task.wait(TELEPORT_DELAY - timeSinceLastTP)
+				end
+
+				if isNpcAlive(npc) then
+					if teleportToNpc(npc) then
+						lastTeleportTime = tick()
+						local humanoid = npc:FindFirstChildOfClass("Humanoid")
+						if humanoid then
+							humanoid.Health = 0
+							humanoid:TakeDamage(999999)
+						end
 					end
 				end
 			end
+		end)
+		if not ok then
+			warn("[AutoKill] Ошибка в processKillQueue: " .. tostring(err))
 		end
-		cleanupNpcData(npc)
+
+		-- Чистим данные ТОЛЬКО если NPC мёртв/исчез: живого (убийство не
+		-- удалось) не трогаем — его подсветка, GUI, линия и счётчик циклов
+		-- нужны, refreshCreatureData поставит его в очередь повторно.
+		if not isNpcAlive(npc) then
+			cleanupNpcData(npc)
+		end
 	end
 
 	isProcessingKills = false
@@ -895,15 +916,18 @@ local function refreshCreatureData()
 		end
 	end
 
-	-- Сверяем известных NPC: мёртвых/исчезнувших удаляем из списков,
-	-- кроме существ из noRefreshList — их данные не трогаем
+	-- Сверяем известных NPC: мёртвых/исчезнувших удаляем из списков
+	-- (кроме существ из noRefreshList). Сначала собираем устаревших NPC
+	-- в снимок и только ПОСЛЕ итераций вызываем cleanupNpcData — она
+	-- удаляет элементы из этих же таблиц, звать её внутри pairs-цикла нельзя.
+	local staleNpcs = {}
 	for name, npcList in pairs(npcKnownObjects) do
 		if not noRefreshList[name] then
 			for i = #npcList, 1, -1 do
 				local npc = npcList[i]
 				if not liveSet[npc] then
+					table.insert(staleNpcs, npc)
 					table.remove(npcList, i)
-					cleanupNpcData(npc)
 				end
 			end
 			if #npcList == 0 then
@@ -912,19 +936,25 @@ local function refreshCreatureData()
 		end
 	end
 
-	-- Чистим следящие таблицы от объектов, которых больше нет (GUI, подсветка, циклы)
 	for npc in pairs(npcCycles) do
 		if not liveSet[npc] and not noRefreshList[npc.Name] then
-			cleanupNpcData(npc)
+			table.insert(staleNpcs, npc)
 		end
 	end
 	for npc in pairs(npcNameGuis) do
 		if not liveSet[npc] and not noRefreshList[npc.Name] then
-			cleanupNpcData(npc)
+			table.insert(staleNpcs, npc)
 		end
 	end
 	for npc in pairs(npcHighlights) do
 		if not liveSet[npc] and not noRefreshList[npc.Name] then
+			table.insert(staleNpcs, npc)
+		end
+	end
+
+	-- Чистим данные устаревших NPC (повторный вызов cleanupNpcData безопасен)
+	for _, npc in ipairs(staleNpcs) do
+		if not liveSet[npc] then
 			cleanupNpcData(npc)
 		end
 	end
@@ -1033,34 +1063,27 @@ runService.Heartbeat:Connect(function()
 end)
 
 -- ==================== ФОНОВЫЕ ОБНОВЛЕНИЯ ====================
-coroutine.wrap(function()
-	while true do
-		wait(1)
-		updateHighlights()
-	end
-end)()
+-- Каждый проход защищён pcall: раньше любая ошибка внутри обновления
+-- навсегда убивала фоновый поток — линии, подсветка и GUI над существами
+-- переставали обновляться. Теперь ошибка выводится в Output, поток живёт.
+local function startSafeLoop(name, interval, updateFn)
+	coroutine.wrap(function()
+		while true do
+			task.wait(interval)
+			local ok, err = pcall(updateFn)
+			if not ok then
+				warn("[AutoKill] Ошибка в " .. name .. ": " .. tostring(err))
+			end
+		end
+	end)()
+end
 
-coroutine.wrap(function()
-	while true do
-		wait(0.2)
-		updateLines()
-	end
-end)()
-
-coroutine.wrap(function()
-	while true do
-		task.wait(0.5)
-		updateCreatureList()
-	end
-end)()
+startSafeLoop("updateHighlights", 1, updateHighlights)
+startSafeLoop("updateLines", 0.2, updateLines)
+startSafeLoop("updateCreatureList", 0.5, updateCreatureList)
 
 -- Периодическое обновление данных о живых существах (каждые 5 секунд)
-coroutine.wrap(function()
-	while true do
-		task.wait(REFRESH_INTERVAL)
-		refreshCreatureData()
-	end
-end)()
+startSafeLoop("refreshCreatureData", REFRESH_INTERVAL, refreshCreatureData)
 
 -- ==================== ПЕРЕТАСКИВАНИЕ GUI ====================
 local dragging = false
