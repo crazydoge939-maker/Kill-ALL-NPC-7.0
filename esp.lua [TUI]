@@ -665,12 +665,12 @@ local function updateLines()
 				end
 
 				-- Плавное перемещение
-			if lineData.TargetPos0 then
-				lineData.Attachment0.WorldPosition = lineData.Attachment0.WorldPosition:Lerp(lineData.TargetPos0, smoothingFactor)
-			end
-			if lineData.TargetPos1 then
-				lineData.Attachment1.WorldPosition = lineData.Attachment1.WorldPosition:Lerp(lineData.TargetPos1, smoothingFactor)
-			end
+				if lineData.TargetPos0 then
+					lineData.Attachment0.WorldPosition = lineData.Attachment0.WorldPosition:Lerp(lineData.TargetPos0, smoothingFactor)
+				end
+				if lineData.TargetPos1 then
+					lineData.Attachment1.WorldPosition = lineData.Attachment1.WorldPosition:Lerp(lineData.TargetPos1, smoothingFactor)
+				end
 			end
 		else
 			-- Удаляем линию если NPC мертв или подсветка выключена
@@ -681,6 +681,36 @@ local function updateLines()
 				npcLines[npc] = nil
 			end
 		end
+	end
+end
+
+-- ==================== НАДЁЖНОЕ УБИЙСТВО ====================
+-- Единичная запись Health = 0 с клиента может быть перезаписана репликацией
+-- с сервера (особенно когда HP неполный и сервер присылает своё значение
+-- здоровья). Поэтому пишем 0 несколько раз, пока NPC действительно не умрёт.
+local function killNpc(npc)
+	local humanoid = npc:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+
+	-- ForceField блокирует TakeDamage — снимаем защиту
+	for _, child in ipairs(npc:GetChildren()) do
+		if child:IsA("ForceField") then
+			child.Parent = nil
+		end
+	end
+
+	for _ = 1, 15 do
+		if not isNpcAlive(npc) then return end -- мёртв — готово
+
+		-- Сначала урон, потом обнуление: TakeDamage по мёртвому хуманоиду
+		-- не работает, поэтому важен порядок
+		if humanoid.Health > 0 then
+			humanoid:TakeDamage(humanoid.MaxHealth + 999999)
+		end
+		humanoid.Health = 0
+		humanoid:ChangeState(Enum.HumanoidStateType.Dead)
+
+		task.wait(0.1)
 	end
 end
 
@@ -705,11 +735,7 @@ local function processKillQueue()
 				if isNpcAlive(npc) then
 					if teleportToNpc(npc) then
 						lastTeleportTime = tick()
-						local humanoid = npc:FindFirstChildOfClass("Humanoid")
-						if humanoid then
-							humanoid.Health = 0
-							humanoid:TakeDamage(999999)
-						end
+						killNpc(npc)
 					end
 				end
 			end
