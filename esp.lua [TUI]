@@ -1,3 +1,4 @@
+
 -- ==================== ОСНОВНЫЕ ПЕРЕМЕННЫЕ ====================
 local isKilling = false
 local killInterval = 3
@@ -772,7 +773,10 @@ local function processKillQueue()
 		end
 	end
 
-	-- Возвращаем кнопки других скриптов в исходное состояние
+	-- Ждём 2 секунды после завершения этапа ТП и убийства,
+	-- прежде чем вернуть кнопки других скриптов в исходное состояние
+	task.wait(2)
+
 	if savedTrickOrTreat and _G.setTrickOrTreatEnabled then
 		_G.setTrickOrTreatEnabled(true)
 	end
