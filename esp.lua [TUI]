@@ -67,7 +67,7 @@ local npcKnownObjects = {} -- {["NPCName"] = {npc1, npc2, ...}} -- отслеж�
 local npcHighlights = {} -- {npc = Highlight}
 local npcLines = {} -- {npc = {Beam, Attachment0, Attachment1, ...}}
 local npcInstancePeriods = {} -- {npc = period} -- индивидуальный период для каждого NPC
-local isEnabled = true -- состояние режима (включено/выключено)
+local isEnabled = false -- состояние режима (включено/выключено)
 local lastTeleportTime = 0 -- время последней телепортации
 local killQueue = {} -- очередь NPC на убийство
 local isProcessingKills = false -- флаг обработки очереди убийств
@@ -133,11 +133,11 @@ Title.Parent = Frame
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0.42, 0, 0.1, 0)
 ToggleButton.Position = UDim2.new(0.06, 0, 0.137, 0)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 ToggleButton.Font = Enum.Font.Sarpanch
 ToggleButton.TextScaled = true
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.Text = "[Start] Kill"
+ToggleButton.Text = "[OFF] Kill"
 ToggleButton.Parent = Frame
 
 local buttonCorner = Instance.new("UICorner")
@@ -176,7 +176,7 @@ creaturePad.Parent = CreatureScroll
 local toggleModeButton = Instance.new("TextButton")
 toggleModeButton.Size = UDim2.new(0.42, 0, 0.1, 0)
 toggleModeButton.Position = UDim2.new(0.52, 0, 0.137, 0)
-toggleModeButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+toggleModeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 toggleModeButton.Font = Enum.Font.Sarpanch
 toggleModeButton.TextScaled = true
 toggleModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1019,12 +1019,12 @@ end
 local function toggleKilling()
 	isKilling = not isKilling
 	if isKilling then
-		ToggleButton.Text = "[Stop] Kill"
-		ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+		ToggleButton.Text = "[ON] Kill"
+		ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
 		lastKillTime = tick()
 	else
-		ToggleButton.Text = "[Start] Kill"
-		ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+		ToggleButton.Text = "[OFF] Kill"
+		ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 	end
 end
 
@@ -1034,13 +1034,13 @@ local function toggleMode()
 	isEnabled = not isEnabled
 
 	if isEnabled then
-		toggleModeButton.Text = "[OFF] Подсветку"
+		toggleModeButton.Text = "[ON] Подсветку"
 		toggleModeButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
 
 		for _, highlight in pairs(npcHighlights) do
 			highlight.FillTransparency = 0
 			highlight.OutlineTransparency = 0
-			highlight.Enabled = true
+			highlight.Enabled = false
 		end
 
 		for _, lineData in pairs(npcLines) do
@@ -1048,16 +1048,16 @@ local function toggleMode()
 		end
 
 		for _, gui in pairs(npcNameGuis) do
-			gui.Enabled = true
+			gui.Enabled = false
 		end
 	else
-		toggleModeButton.Text = "[ON] Подсветку"
+		toggleModeButton.Text = "[OFF] Подсветку"
 		toggleModeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 
 		for _, highlight in pairs(npcHighlights) do
 			highlight.FillTransparency = 1
 			highlight.OutlineTransparency = 1
-			highlight.Enabled = false
+			highlight.Enabled = true
 		end
 
 		for _, lineData in pairs(npcLines) do
@@ -1065,7 +1065,7 @@ local function toggleMode()
 		end
 
 		for _, gui in pairs(npcNameGuis) do
-			gui.Enabled = false
+			gui.Enabled = true
 		end
 	end
 end
