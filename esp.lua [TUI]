@@ -723,6 +723,23 @@ local function processKillQueue()
 	if isProcessingKills then return end
 	isProcessingKills = true
 
+	-- Сохраняем и отключаем активные кнопки других скриптов на время телепорта
+	local savedTrickOrTreat = _G.getTrickOrTreatEnabled and _G.getTrickOrTreatEnabled() or false
+	local savedChests, savedItems = false, false
+	if _G.getAutoFarmModes then
+		savedChests, savedItems = _G.getAutoFarmModes()
+	end
+
+	if savedTrickOrTreat and _G.setTrickOrTreatEnabled then
+		_G.setTrickOrTreatEnabled(false)
+	end
+	if savedChests and _G.setAutoFarmModes then
+		_G.setAutoFarmModes(false, nil, nil)
+	end
+	if savedItems and _G.setAutoFarmModes then
+		_G.setAutoFarmModes(nil, false, nil)
+	end
+
 	while #killQueue > 0 do
 		local npc = table.remove(killQueue, 1)
 		-- Обработка одного NPC защищена pcall: ошибка не убивает поток
@@ -753,6 +770,17 @@ local function processKillQueue()
 		if not isNpcAlive(npc) then
 			cleanupNpcData(npc)
 		end
+	end
+
+	-- Возвращаем кнопки других скриптов в исходное состояние
+	if savedTrickOrTreat and _G.setTrickOrTreatEnabled then
+		_G.setTrickOrTreatEnabled(true)
+	end
+	if savedChests and _G.setAutoFarmModes then
+		_G.setAutoFarmModes(true, nil, nil)
+	end
+	if savedItems and _G.setAutoFarmModes then
+		_G.setAutoFarmModes(nil, true, nil)
 	end
 
 	isProcessingKills = false
