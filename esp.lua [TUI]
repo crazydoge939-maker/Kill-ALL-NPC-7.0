@@ -1,4 +1,3 @@
-
 -- ==================== ОСНОВНЫЕ ПЕРЕМЕННЫЕ ====================
 local isKilling = false
 local killInterval = 3
@@ -37,7 +36,7 @@ local specialNPCs = {
 	["Demon"] = true,
 	["Halloween Hell:GRIM"] = true,
 	["BIG PUMPKIN"] = true,
-	["PumkinMiniBo66"] = true,
+	["PumkinMiniBoss"] = true,
 	["Mask"] = true,
 	["Alien Protector"] = true,
 	["King Small Trollge"] = true,
