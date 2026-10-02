@@ -1,4 +1,3 @@
-
 -- ==================== ОСНОВНЫЕ ПЕРЕМЕННЫЕ ====================
 local isKilling = false
 local killInterval = 3
@@ -775,16 +774,26 @@ local function processKillQueue()
 
 	-- Ждём 2 секунды после завершения этапа ТП и убийства,
 	-- прежде чем вернуть кнопки других скриптов в исходное состояние
-	task.wait(2)
+	task.wait(1)
 
-	if savedTrickOrTreat and _G.setTrickOrTreatEnabled then
-		_G.setTrickOrTreatEnabled(true)
+	-- Восстанавливаем кнопки только если пользователь не включил их вручную
+	-- во время обработки. Если включил — не трогаем.
+	if savedTrickOrTreat and _G.setTrickOrTreatEnabled and _G.getTrickOrTreatEnabled then
+		if not _G.getTrickOrTreatEnabled() then
+			_G.setTrickOrTreatEnabled(true)
+		end
 	end
-	if savedChests and _G.setAutoFarmModes then
-		_G.setAutoFarmModes(true, nil, nil)
+	if savedChests and _G.setAutoFarmModes and _G.getAutoFarmModes then
+		local currentChests = _G.getAutoFarmModes()
+		if not currentChests then
+			_G.setAutoFarmModes(true, nil, nil)
+		end
 	end
-	if savedItems and _G.setAutoFarmModes then
-		_G.setAutoFarmModes(nil, true, nil)
+	if savedItems and _G.setAutoFarmModes and _G.getAutoFarmModes then
+		local _, currentItems = _G.getAutoFarmModes()
+		if not currentItems then
+			_G.setAutoFarmModes(nil, true, nil)
+		end
 	end
 
 	isProcessingKills = false
@@ -1145,6 +1154,11 @@ startSafeLoop("updateCreatureList", 0.5, updateCreatureList)
 
 -- Периодическое обновление данных о живых существах (каждые 5 секунд)
 startSafeLoop("refreshCreatureData", REFRESH_INTERVAL, refreshCreatureData)
+
+-- ==================== ВНЕШНЕЕ УПРАВЛЕНИЕ (для AutoFarm) ====================
+-- Позволяет другим скриптам проверять состояние AutoKill
+_G.getAutoKillProcessing = function() return isProcessingKills end
+_G.getAutoKillEnabled = function() return isKilling end
 
 -- ==================== ПЕРЕТАСКИВАНИЕ GUI ====================
 local dragging = false
