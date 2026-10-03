@@ -16,7 +16,8 @@ local doNotKillList = {
 	["DJ"] = true,
 	["Bounty Hunter"] = true,
 	["Mysterious Seller"] = true,
-	["Fruit Dealer"] = true
+	["Fruit Dealer"] = true,
+	["BIG PUMPKIN"] = true,
 }
 
 -- Существа, данные которых НЕ нужно обновлять (не удаляются из списков при обновлении)
@@ -35,7 +36,6 @@ local specialNPCs = {
 	["Elf Traveler"] = true,
 	["Demon"] = true,
 	["Halloween Hell:GRIM"] = true,
-	["BIG PUMPKIN"] = true,
 	["PumpkinMiniMiniBoss"] = true,
 	["Soul"] = true,
 	["Mask"] = true,
