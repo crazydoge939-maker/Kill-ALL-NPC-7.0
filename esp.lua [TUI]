@@ -8,7 +8,6 @@ local LocalPlayer = Players.LocalPlayer
 
 -- ==================== НАСТРОЙКИ ====================
 -- MAX_CYCLES заменён на систему периодов (npcKillPeriods / DEFAULT_KILL_PERIOD)
-local TELEPORT_DELAY = 1 -- Задержка между телепортациями к разным NPC (в секундах)
 
 -- ==================== СПИСКИ NPC ====================
 -- NPC, которых не нужно убивать
@@ -68,7 +67,6 @@ local npcHighlights = {} -- {npc = Highlight}
 local npcLines = {} -- {npc = {Beam, Attachment0, Attachment1, ...}}
 local npcInstancePeriods = {} -- {npc = period} -- индивидуальный период для каждого NPC
 local isEnabled = false -- состояние режима (включено/выключено)
-local lastTeleportTime = 0 -- время последней телепортации
 local killQueue = {} -- очередь NPC на убийство
 local isProcessingKills = false -- флаг обработки очереди убийств
 
@@ -250,17 +248,6 @@ killPeriodInput.FocusLost:Connect(function()
 	end
 end)
 
--- TP CD (задержка телепортации)
-local teleportDelayInput = createSettingRow(settingsFrame, "TP CD (сек):", TELEPORT_DELAY, 0.7)
-teleportDelayInput.FocusLost:Connect(function()
-	local num = tonumber(teleportDelayInput.Text)
-	if num and num > 0 then
-		TELEPORT_DELAY = num
-		teleportDelayInput.Text = tostring(num)
-	else
-		teleportDelayInput.Text = tostring(TELEPORT_DELAY)
-	end
-end)
 
 -- Линия прогресса
 local ProgressBackground = Instance.new("Frame")
@@ -493,22 +480,6 @@ local function getPlayerPosition()
 	return nil
 end
 
--- Телепортация к NPC
-local function teleportToNpc(npc)
-	local playerCharacter = LocalPlayer.Character
-	if not playerCharacter then return false end
-
-	local playerHrp = playerCharacter:FindFirstChild("HumanoidRootPart")
-	local npcHrp = npc:FindFirstChild("HumanoidRootPart")
-
-	if not playerHrp or not npcHrp then return false end
-
-	-- Телепортируем игрока к NPC
-	playerHrp.CFrame = npcHrp.CFrame + Vector3.new(0, 30, 0) -- Немного выше NPC
-
-	print("[Auto Killer] Телепортировался к NPC: " .. npc.Name)
-	return true
-end
 
 -- ==================== ОЧИСТКА ДАННЫХ NPC ====================
 local function cleanupNpcData(npc)
@@ -723,41 +694,13 @@ local function processKillQueue()
 	if isProcessingKills then return end
 	isProcessingKills = true
 
-	-- Сохраняем и отключаем активные кнопки других скриптов на время телепорта
-	local savedTrickOrTreat = _G.getTrickOrTreatEnabled and _G.getTrickOrTreatEnabled() or false
-	local savedChests, savedItems = false, false
-	if _G.getAutoFarmModes then
-		savedChests, savedItems = _G.getAutoFarmModes()
-	end
-
-	if savedTrickOrTreat and _G.setTrickOrTreatEnabled then
-		_G.setTrickOrTreatEnabled(false)
-	end
-	if savedChests and _G.setAutoFarmModes then
-		_G.setAutoFarmModes(false, nil, nil)
-	end
-	if savedItems and _G.setAutoFarmModes then
-		_G.setAutoFarmModes(nil, false, nil)
-	end
-
 	while #killQueue > 0 do
 		local npc = table.remove(killQueue, 1)
 		-- Обработка одного NPC защищена pcall: ошибка не убивает поток
 		-- и не оставляет isProcessingKills навсегда включённым
 		local ok, err = pcall(function()
 			if isNpcAlive(npc) then
-				local currentTime = tick()
-				local timeSinceLastTP = currentTime - lastTeleportTime
-				if timeSinceLastTP < TELEPORT_DELAY then
-					task.wait(TELEPORT_DELAY - timeSinceLastTP)
-				end
-
-				if isNpcAlive(npc) then
-					if teleportToNpc(npc) then
-						lastTeleportTime = tick()
-						killNpc(npc)
-					end
-				end
+				killNpc(npc)
 			end
 		end)
 		if not ok then
@@ -769,30 +712,6 @@ local function processKillQueue()
 		-- нужны, refreshCreatureData поставит его в очередь повторно.
 		if not isNpcAlive(npc) then
 			cleanupNpcData(npc)
-		end
-	end
-
-	-- Ждём 2 секунды после завершения этапа ТП и убийства,
-	-- прежде чем вернуть кнопки других скриптов в исходное состояние
-	task.wait(1)
-
-	-- Восстанавливаем кнопки только если пользователь не включил их вручную
-	-- во время обработки. Если включил — не трогаем.
-	if savedTrickOrTreat and _G.setTrickOrTreatEnabled and _G.getTrickOrTreatEnabled then
-		if not _G.getTrickOrTreatEnabled() then
-			_G.setTrickOrTreatEnabled(true)
-		end
-	end
-	if savedChests and _G.setAutoFarmModes and _G.getAutoFarmModes then
-		local currentChests = _G.getAutoFarmModes()
-		if not currentChests then
-			_G.setAutoFarmModes(true, nil, nil)
-		end
-	end
-	if savedItems and _G.setAutoFarmModes and _G.getAutoFarmModes then
-		local _, currentItems = _G.getAutoFarmModes()
-		if not currentItems then
-			_G.setAutoFarmModes(nil, true, nil)
 		end
 	end
 
